@@ -35,15 +35,17 @@ The skill lists what it will create or change and asks for confirmation before
 writing files. It ends with the manual steps it cannot do for you (NuGet trusted
 publisher, Codecov token, repository settings).
 
-Before generating files, the skill runs `scripts/latest_versions.py` to get the
-current .NET LTS release and the latest version of every GitHub Action its
-templates pin, so generated files never start out of date.
+Before generating files, the skill runs `scripts/latest_versions.py`. It reports
+the current .NET and Node.js LTS releases and flags every outdated pin in the
+templates (SDK, target framework, `node-version`, GitHub Actions), so generated
+files never start out of date. During an upgrade, `--root <repository>` checks
+an existing repository the same way.
 
 ## Requirements
 
 - Python 3 for `scripts/latest_versions.py` (standard library only). It needs
-  network access to builds.dotnet.microsoft.com and github.com; without it, the
-  skill falls back to a web search.
+  network access to builds.dotnet.microsoft.com, nodejs.org and github.com;
+  without it, the skill falls back to a web search.
 - The generated repository needs the .NET SDK, Node.js (for semantic-release
   and Docusaurus) and Docker (for Testcontainers).
 

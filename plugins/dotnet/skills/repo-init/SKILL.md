@@ -43,12 +43,13 @@ when copying** and never create a `dot-*` file in the target repository:
    python3 scripts/latest_versions.py
    ```
 
-   It prints the current **LTS** .NET release and SDK, then compares every
-   action pinned in `templates/dot-github/workflows/` with its latest release
-   and flags outdated pins. Use its versions instead of any version written in
-   the templates. Add `--workflows <dir>` to check an existing repository's
-   workflows during an upgrade. If the script cannot reach the network,
-   web-search the same information instead.
+   It prints the current **LTS** releases of .NET and Node.js, then checks the
+   templates and flags every outdated pin: the SDK in `global.json`, the
+   target framework in `Directory.Build.props`, `node-version` and every
+   action in the workflows. Use its versions instead of any version written in
+   the templates. During an upgrade, run it with `--root <repository>` to check
+   the existing repository the same way. If the script cannot reach the
+   network, web-search the same information instead.
 4. **Confirm the plan before generating or overwriting files** — list what
    will be created/changed, group changes by checklist section, and flag any
    assumption (project type, single vs. multi-package, license already
@@ -119,7 +120,7 @@ whenever the relevant section is applied, don't let them get lost:
 references/
   standards.md                  Full checklist, §1 to §14
 scripts/
-  latest_versions.py            Latest .NET LTS and GitHub Action versions
+  latest_versions.py            Checks SDK, target framework, Node.js and action pins
 templates/
   dot-editorconfig              -> .editorconfig
   dot-gitignore                 -> .gitignore

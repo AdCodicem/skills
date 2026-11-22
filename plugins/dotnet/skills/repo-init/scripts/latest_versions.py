@@ -1,19 +1,26 @@
-"""Report the latest .NET LTS release and check GitHub Action pins.
+"""Check a .NET repository's pinned versions against the latest releases.
 
-Prints the current LTS .NET channel with its latest SDK and runtime, then
-compares every `uses: owner/repo@ref` found in the workflow files with the
-action's latest release.
+Reports the current LTS releases of .NET and Node.js, then checks:
 
-Standard library only. Needs network access to builds.dotnet.microsoft.com
-and github.com. Action tags come from `git ls-remote` when git is installed,
-otherwise from the GitHub REST API (set GITHUB_TOKEN to raise its rate limit).
+- every `uses: owner/repo@ref` in the workflow files against the action's
+  latest release;
+- the SDK pinned in `global.json` against the latest .NET LTS SDK;
+- the highest `netX.Y` target framework in `*.props` and `*.csproj` files
+  against the .NET LTS channel;
+- every `node-version:` in the workflow files against the Node.js LTS.
+
+Standard library only. Needs network access to builds.dotnet.microsoft.com,
+nodejs.org and github.com. Action tags come from `git ls-remote` when git is
+installed, otherwise from the GitHub REST API (set GITHUB_TOKEN to raise its
+rate limit).
 
 Usage:
-    python3 scripts/latest_versions.py [--workflows DIR ...] [--json]
+    python3 scripts/latest_versions.py [--root DIR] [--json]
 
-By default it checks this skill's templates (templates/dot-github/workflows).
+--root is the repository to check (default: this skill's templates). Workflows
+are read from `.github/workflows/` or `dot-github/workflows/` under it.
 
-Exit codes: 0 every pin is current, 1 some pins are outdated, 2 a lookup failed.
+Exit codes: 0 everything is current, 1 something is outdated, 2 a lookup failed.
 """
 
 from __future__ import annotations
@@ -27,21 +34,38 @@ import subprocess
 import sys
 import urllib.request
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 DOTNET_INDEX_URL = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/releases-index.json"
-DEFAULT_WORKFLOWS = Path(__file__).resolve().parents[1] / "templates" / "dot-github" / "workflows"
+NODE_INDEX_URL = "https://nodejs.org/dist/index.json"
+DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "templates"
+WORKFLOW_DIRS = (".github/workflows", "dot-github/workflows")
+SKIPPED_DIRS = {"bin", "obj", "node_modules", ".git"}
 USES = re.compile(
     r"^\s*(?:-\s*)?uses:\s*['\"]?"
     r"(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[^@\s'\"]*)?@(?P<ref>[^\s'\"#]+)",
     re.MULTILINE,
 )
+NODE_VERSION = re.compile(r"^\s*node-version:\s*['\"]?(?P<value>[^\s'\"#]+)", re.MULTILINE)
+TARGET_FRAMEWORKS = re.compile(r"<TargetFrameworks?>([^<]+)</TargetFrameworks?>")
+NET_TFM = re.compile(r"^net(\d+)\.(\d+)")
 VERSION_TAG = re.compile(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 TIMEOUT = 20
 
 TagLister = Callable[[str], list[str]]
-JsonFetcher = Callable[[str], dict]
+JsonFetcher = Callable[[str], object]
+
+
+@dataclass
+class Pins:
+    """Versions pinned in a repository, with the file each one comes from."""
+
+    actions: dict[str, set[str]] = field(default_factory=dict)
+    node: list[tuple[str, str]] = field(default_factory=list)
+    sdk: list[tuple[str, str]] = field(default_factory=list)
+    frameworks: list[tuple[str, str]] = field(default_factory=list)
 
 
 def parse_version(tag: str) -> tuple[int, int, int] | None:
@@ -52,18 +76,41 @@ def parse_version(tag: str) -> tuple[int, int, int] | None:
     return tuple(int(part or 0) for part in match.groups())  # type: ignore[return-value]
 
 
-def find_pins(paths: Iterable[Path]) -> dict[str, set[str]]:
-    """Map each action repository (`owner/repo`) to the refs pinned in workflow files."""
-    pins: dict[str, set[str]] = {}
-    for path in paths:
-        files = sorted(path.glob("*.y*ml")) if path.is_dir() else [path]
-        for file in files:
-            for match in USES.finditer(file.read_text(encoding="utf-8")):
-                pins.setdefault(match["repo"], set()).add(match["ref"])
+def _files(root: Path, pattern: str) -> list[Path]:
+    return sorted(
+        p for p in root.rglob(pattern) if not SKIPPED_DIRS.intersection(p.relative_to(root).parts)
+    )
+
+
+def scan(root: Path) -> Pins:
+    """Collect action, Node.js, SDK and target framework pins under `root`."""
+    pins = Pins()
+    for folder in WORKFLOW_DIRS:
+        for file in sorted((root / folder).glob("*.y*ml")):
+            text = file.read_text(encoding="utf-8")
+            name = file.relative_to(root).as_posix()
+            for match in USES.finditer(text):
+                pins.actions.setdefault(match["repo"], set()).add(match["ref"])
+            pins.node.extend((name, m["value"]) for m in NODE_VERSION.finditer(text))
+
+    global_json = root / "global.json"
+    if global_json.is_file():
+        version = json.loads(global_json.read_text(encoding="utf-8")).get("sdk", {}).get("version")
+        if version:
+            pins.sdk.append(("global.json", version))
+
+    for file in _files(root, "*.props") + _files(root, "*.csproj"):
+        text = file.read_text(encoding="utf-8")
+        tfms = [t.strip() for m in TARGET_FRAMEWORKS.finditer(text) for t in m[1].split(";")]
+        versioned = [
+            (tuple(map(int, NET_TFM.match(t).groups())), t) for t in tfms if NET_TFM.match(t)
+        ]
+        if versioned:
+            pins.frameworks.append((file.relative_to(root).as_posix(), max(versioned)[1]))
     return pins
 
 
-def latest_lts(index: dict) -> dict:
+def latest_dotnet_lts(index: dict) -> dict:
     """Pick the newest supported LTS channel from the .NET releases index."""
     candidates = [
         release
@@ -80,6 +127,19 @@ def latest_lts(index: dict) -> dict:
         "runtime": best["latest-runtime"],
         "support_phase": best["support-phase"],
         "eol_date": best.get("eol-date"),
+    }
+
+
+def latest_node_lts(index: list[dict]) -> dict:
+    """The newest LTS line in the Node.js release index is the active LTS."""
+    releases = [r for r in index if r.get("lts")]
+    if not releases:
+        raise ValueError("no LTS release in the Node.js index")
+    best = max(releases, key=lambda r: parse_version(r["version"]) or (0, 0, 0))
+    return {
+        "major": parse_version(best["version"])[0],
+        "version": best["version"],
+        "codename": best["lts"],
     }
 
 
@@ -111,6 +171,31 @@ def pin_status(ref: str, latest_tag: str) -> str:
     return "current" if pinned[:depth] >= latest[:depth] else "outdated"
 
 
+def node_status(value: str, lts_major: int) -> str:
+    """Compare a `node-version` value (`26`, `26.x`, `lts/*`...) with the LTS major."""
+    if value.startswith("lts/"):
+        return "current"
+    match = re.match(r"^\D*(\d+)", value)
+    if not match:
+        return "unknown"
+    return "current" if int(match[1]) >= lts_major else "outdated"
+
+
+def sdk_status(pinned: str, latest: str) -> str:
+    pinned_version, latest_version = parse_version(pinned), parse_version(latest)
+    if pinned_version is None or latest_version is None:
+        return "unknown"
+    return "current" if pinned_version >= latest_version else "outdated"
+
+
+def framework_status(tfm: str, channel: str) -> str:
+    match = NET_TFM.match(tfm)
+    if not match:
+        return "unknown"
+    lts = tuple(int(part) for part in channel.split("."))
+    return "current" if tuple(map(int, match.groups())) >= lts else "outdated"
+
+
 def git_tags(repo: str) -> list[str]:
     git = shutil.which("git")
     if not git:
@@ -125,7 +210,7 @@ def git_tags(repo: str) -> list[str]:
     return [line.rsplit("refs/tags/", 1)[-1] for line in result.stdout.splitlines() if line]
 
 
-def fetch_json(url: str) -> dict | list:
+def fetch_json(url: str) -> object:
     headers = {"Accept": "application/json", "User-Agent": "dotnet-repo-init-skill"}
     token = os.environ.get("GITHUB_TOKEN")
     if token and url.startswith("https://api.github.com/"):
@@ -148,23 +233,43 @@ def list_tags(repo: str) -> list[str]:
 
 
 def build_report(
-    pins: dict[str, set[str]],
+    pins: Pins,
     tag_lister: TagLister = list_tags,
-    index_fetcher: JsonFetcher = fetch_json,
+    fetcher: JsonFetcher = fetch_json,
 ) -> dict:
-    report: dict = {"dotnet": None, "actions": [], "errors": []}
-    try:
-        report["dotnet"] = latest_lts(index_fetcher(DOTNET_INDEX_URL))
-    except Exception as exc:  # noqa: BLE001 - report every lookup failure, never crash
-        report["errors"].append(f".NET releases index: {exc}")
+    report: dict = {"dotnet": None, "node": None, "runtimes": [], "actions": [], "errors": []}
+    for key, url, parse in (
+        ("dotnet", DOTNET_INDEX_URL, latest_dotnet_lts),
+        ("node", NODE_INDEX_URL, latest_node_lts),
+    ):
+        try:
+            report[key] = parse(fetcher(url))
+        except Exception as exc:  # noqa: BLE001 - report every lookup failure, never crash
+            report["errors"].append(f"{url}: {exc}")
 
-    for repo in sorted(pins):
+    def runtime(name: str, file: str, pinned: str, latest: str, status: str) -> None:
+        report["runtimes"].append(
+            {"runtime": name, "file": file, "pinned": pinned, "latest": latest, "status": status}
+        )
+
+    if dotnet := report["dotnet"]:
+        for file, version in pins.sdk:
+            runtime(".NET SDK", file, version, dotnet["sdk"], sdk_status(version, dotnet["sdk"]))
+        latest_tfm = f"net{dotnet['channel']}"
+        for file, tfm in pins.frameworks:
+            status = framework_status(tfm, dotnet["channel"])
+            runtime("Target framework", file, tfm, latest_tfm, status)
+    if node := report["node"]:
+        for file, value in pins.node:
+            runtime("Node.js", file, value, str(node["major"]), node_status(value, node["major"]))
+
+    for repo in sorted(pins.actions):
         try:
             latest_tag, pin = latest_release(tag_lister(repo))
         except Exception as exc:  # noqa: BLE001
             report["errors"].append(f"{repo}: {exc}")
             continue
-        for ref in sorted(pins[repo]):
+        for ref in sorted(pins.actions[repo]):
             report["actions"].append(
                 {
                     "action": repo,
@@ -177,23 +282,37 @@ def build_report(
     return report
 
 
+def _table(headers: list[str], rows: list[list[str]]) -> list[str]:
+    widths = [
+        max(len(str(cell)) for cell in column) for column in zip(headers, *rows, strict=False)
+    ]
+    return [
+        "  ".join(f"{cell:<{width}}" for cell, width in zip(row, widths, strict=True)).rstrip()
+        for row in [headers, *rows]
+    ]
+
+
 def format_report(report: dict) -> str:
     lines = []
-    dotnet = report["dotnet"]
-    if dotnet:
+    if dotnet := report["dotnet"]:
         lines.append(
             f".NET LTS: {dotnet['channel']} (SDK {dotnet['sdk']}, runtime {dotnet['runtime']}, "
             f"{dotnet['support_phase']}, end of support {dotnet['eol_date']})"
         )
+    if node := report["node"]:
+        lines.append(f"Node.js LTS: {node['major']} ({node['version']}, {node['codename']})")
+    if report["runtimes"]:
+        rows = [
+            [r["runtime"], r["file"], r["pinned"], r["latest"], r["status"].upper()]
+            for r in report["runtimes"]
+        ]
+        lines += ["", *_table(["Runtime", "File", "Pinned", "Latest", "Status"], rows)]
     if report["actions"]:
-        width = max(len(item["action"]) for item in report["actions"])
-        lines.append("")
-        lines.append(f"{'Action':<{width}}  {'Pinned':<10}  {'Latest':<10}  {'Use':<10}  Status")
-        for item in report["actions"]:
-            lines.append(
-                f"{item['action']:<{width}}  {item['pinned']:<10}  {item['latest']:<10}  "
-                f"{item['recommended']:<10}  {item['status'].upper()}"
-            )
+        rows = [
+            [a["action"], a["pinned"], a["latest"], a["recommended"], a["status"].upper()]
+            for a in report["actions"]
+        ]
+        lines += ["", *_table(["Action", "Pinned", "Latest", "Use", "Status"], rows)]
     for error in report["errors"]:
         lines.append(f"ERROR {error}")
     if report["errors"]:
@@ -202,21 +321,22 @@ def format_report(report: dict) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Report the latest .NET LTS and action versions.")
+    parser = argparse.ArgumentParser(description="Check pinned versions against latest releases.")
     parser.add_argument(
-        "--workflows",
+        "--root",
         type=Path,
-        action="append",
-        help="workflow folder or file to check (default: this skill's templates)",
+        default=DEFAULT_ROOT,
+        help="repository to check (default: this skill's templates)",
     )
     parser.add_argument("--json", action="store_true", help="print the report as JSON")
     args = parser.parse_args(argv)
 
-    report = build_report(find_pins(args.workflows or [DEFAULT_WORKFLOWS]))
+    report = build_report(scan(args.root.resolve()))
     print(json.dumps(report, indent=2) if args.json else format_report(report))
     if report["errors"]:
         return 2
-    return 1 if any(item["status"] == "outdated" for item in report["actions"]) else 0
+    items = report["runtimes"] + report["actions"]
+    return 1 if any(item["status"] == "outdated" for item in items) else 0
 
 
 if __name__ == "__main__":
