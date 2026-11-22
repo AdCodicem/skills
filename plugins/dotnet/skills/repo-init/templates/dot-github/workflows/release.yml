@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
 
       # Trusted publishing: exchange the GitHub OIDC token for a short-lived
       # NuGet.org API key. Requires the trusted publisher to be registered
