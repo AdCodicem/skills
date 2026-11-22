@@ -1,6 +1,6 @@
 ---
 name: run-evals
-description: Run or write the behavioural eval suites of this repository's plugins with claude plugin eval, using the user's Claude subscription so that no API billing occurs. Use when the user wants to evaluate a plugin or skill, check whether a skill triggers correctly, compare against the no-plugin baseline, or add eval cases.
+description: Run or write the behavioral eval suites of this repository's plugins with claude plugin eval, using the user's Claude subscription so that no API billing occurs. Use when the user wants to evaluate a plugin or skill, check whether a skill triggers correctly, compare against the no-plugin baseline, or add eval cases.
 ---
 
 # Run evals

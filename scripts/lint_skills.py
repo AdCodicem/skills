@@ -218,7 +218,7 @@ class Linter:
             self.warning(
                 skill.path,
                 f"{len(dotfiles)} dotfile(s) ({sample}) may be dropped when the skill is "
-                "synced from claude.ai",
+                "synced from claude.ai: store them with a 'dot-' prefix",
             )
         if total > API_UPLOAD_MAX_BYTES:
             self.error(skill.path, "skill is larger than the 30 MB API upload limit")

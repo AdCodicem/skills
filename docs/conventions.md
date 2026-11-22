@@ -97,8 +97,9 @@ packages; claude.ai network access depends on the user's settings.
 - The packaged name `<plugin>-<skill>` must stay within 64 characters and must
   not contain `claude` or `anthropic` **(lint)**.
 - Total size under 30 MB **(lint)**.
-- Avoid dotfiles: they were observed to be dropped when a skill was synced from
-  claude.ai (the linter warns).
+- No dotfiles: they were observed to be dropped when a skill was synced from
+  claude.ai (the linter warns). Store them with a `dot-` prefix
+  (`templates/dot-github/`) and tell the skill to strip it when copying.
 - `api` skills must work without network access.
 
 ## Subagents
@@ -157,4 +158,4 @@ Source: [plugin platform support](https://claude.com/docs/plugins/platform-suppo
   `BREAKING CHANGE:` a major.
 - Pull requests are squash-merged; CI checks that the PR title is a
   Conventional Commit.
-- Everything in English.
+- Everything in American English (en-US spelling).

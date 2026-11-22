@@ -1,7 +1,7 @@
 # Testing
 
 Four layers. The first three are deterministic, free and run in CI. The fourth
-is behavioural, recommended before a release, and runs locally on a Claude
+is behavioral, recommended before a release, and runs locally on a Claude
 subscription so that nothing is billed to an API account.
 
 | Layer | Tool | What it catches | Where |

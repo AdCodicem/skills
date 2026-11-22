@@ -6,8 +6,9 @@ packaged for claude.ai and the Claude API.
 
 ## Rules
 
-- **English only**: code, comments, docs, commit messages, skill content.
-  Trigger phrases in other languages inside a skill description are allowed.
+- **American English only** (en-US spelling): code, comments, docs, commit
+  messages, skill content. Trigger phrases in other languages inside a skill
+  description are allowed.
 - **Follow [docs/conventions.md](docs/conventions.md)**. `scripts/lint_skills.py`
   enforces most of it.
 - **Skill and hook scripts: Python 3.11 standard library only.** Bash only for

@@ -40,8 +40,9 @@ python scripts/new_skill.py <plugin> <skill> --description "<description>" --sur
   are called with paths relative to the skill folder. Add tests for them in the
   plugin's `tests/` folder (pytest, run with `sys.executable`).
 - **Templates and assets** (files the skill copies or reads, never runs) go in
-  `templates/` or `assets/`. Avoid dotfiles in portable skills when you can:
-  they may be dropped when the skill is synced from claude.ai.
+  `templates/` or `assets/`. In portable skills, store dotfiles with a `dot-`
+  prefix (`dot-github/`, `dot-editorconfig`) and tell the skill to strip it
+  when copying: dotfiles may be dropped when a skill is synced from claude.ai.
 - Claude Code-only frontmatter (`allowed-tools`, `disable-model-invocation`,
   `argument-hint`, `context`...) is fine for `claude-code` skills; the packager
   strips everything but `name` and `description` for claude.ai and the API.
