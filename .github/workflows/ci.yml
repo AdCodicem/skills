@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate plugins
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install Claude Code
+        run: npm install --global @anthropic-ai/claude-code
+      - name: Validate the marketplace, plugins and examples
+        run: |
+          claude plugin validate . --strict
+          for dir in plugins/*/ examples/*/; do
+            claude plugin validate "$dir" --strict
+          done
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Repository conventions
+        run: python scripts/lint_skills.py
+      - name: Ruff
+        run: |
+          ruff check --output-format=github .
+          ruff format --check .
+      - name: Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v25
+        with:
+          globs: "**/*.md"
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows catches path and encoding issues in skill scripts and hooks.
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          # The Claude API code execution container runs Python 3.11.
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  package:
+    name: Package skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python scripts/package_skills.py --include-examples --out dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: skills
+          path: dist/
+          retention-days: 7
