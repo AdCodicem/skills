@@ -25,15 +25,27 @@ under Customize > Skills.
 
 ## Usage
 
-- "Initialise ce repo" or "Set up a new .NET library repository with my standards"
-- "Upgrade this .NET repository to my standard toolchain"
+- "Set up a new .NET library repository with my standards" or "Initialise ce repo .NET"
+- "Upgrade this C# repository to my standard toolchain"
+
+It only triggers for .NET repositories: a generic "initialize this repo" in a
+Node.js or Python project leaves it alone.
 
 The skill lists what it will create or change and asks for confirmation before
 writing files. It ends with the manual steps it cannot do for you (NuGet trusted
 publisher, Codecov token, repository settings).
 
+Before generating files, the skill runs `scripts/latest_versions.py` to get the
+current .NET LTS release and the latest version of every GitHub Action its
+templates pin, so generated files never start out of date.
+
 ## Requirements
 
-None: the skill only ships instructions and templates. The generated repository
-needs the .NET SDK, Node.js (for semantic-release and Docusaurus) and Docker
-(for Testcontainers).
+- Python 3 for `scripts/latest_versions.py` (standard library only). It needs
+  network access to builds.dotnet.microsoft.com and github.com; without it, the
+  skill falls back to a web search.
+- The generated repository needs the .NET SDK, Node.js (for semantic-release
+  and Docusaurus) and Docker (for Testcontainers).
+
+Templates whose real name starts with a dot are stored with a `dot-` prefix
+(`templates/dot-github/` for `.github/`), because claude.ai drops dotfiles.

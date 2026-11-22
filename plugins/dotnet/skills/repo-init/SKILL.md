@@ -1,6 +1,6 @@
 ---
 name: repo-init
-description: Initialize a new personal open-source .NET repository, or audit and upgrade an existing one, to AdCodicem's standard toolchain (CI/CD, tests, docs, release automation, community files). Trigger on "initialise ce repo", "nouveau repo .NET", "mets ce repo à niveau", "applique mes standards à ce projet", or any request to scaffold/upgrade a personal .NET open-source project.
+description: 'Scaffold a new personal open-source .NET (C#) repository, or audit and upgrade an existing one, to AdCodicem''s standard .NET toolchain: SDK pinning, analyzers and code style, xUnit and Testcontainers tests, Conventional Commits with semantic-release, NuGet trusted publishing, Docusaurus docs, CodeQL, Scorecard and Dependabot. Use only for .NET repositories, meaning a .sln, .slnx or .csproj is present or the user asks for a .NET, C# or NuGet project. Example requests: "set up a new .NET library repo", "upgrade this C# repo to my standards", "initialise ce repo .NET", "nouveau repo .NET", "mets ce repo .NET à niveau". Do not use for repositories in other languages, even when the request is only "initialize this repo".'
 metadata:
   surfaces: claude-code, claude-ai
 ---
@@ -10,28 +10,52 @@ metadata:
 Reference skill for scaffolding a new personal open-source .NET repository, or
 auditing and upgrading an existing one, to a consistent toolchain. Companion
 files live in `templates/` next to this SKILL.md — copy and adapt them rather
-than regenerating from scratch.
+than regenerating from scratch. The full checklist is in
+[references/standards.md](references/standards.md).
+
+## Template file names: the `dot-` prefix
+
+Files whose real name starts with a dot are stored with a `dot-` prefix, because
+dotfiles get dropped when a skill is synced from claude.ai. **Strip the prefix
+when copying** and never create a `dot-*` file in the target repository:
+
+| In `templates/` | In the target repository |
+| --- | --- |
+| `dot-github/` | `.github/` |
+| `dot-editorconfig` | `.editorconfig` |
+| `dot-gitignore` | `.gitignore` |
+| `dot-releaserc.json` | `.releaserc.json` |
 
 ## Before touching any file
 
-1. **Determine mode**: new repo (scaffold) or existing repo (audit + upgrade).
+1. **Check that this is a .NET repository.** Look for `.sln`, `.slnx` or
+   `.csproj` files, or an explicit .NET/C# request. If the repository uses
+   another language, stop and say this skill only covers .NET.
+2. **Determine mode**: new repo (scaffold) or existing repo (audit + upgrade).
    For an upgrade, read the current repo first (structure, `.csproj` files,
-   existing CI, existing docs) and diff it against the checklist below —
-   never assume, inspect.
-2. **Verify what "latest stable" means today.** `.NET` LTS/STS cadence and
-   GitHub Action versions (`actions/checkout`, `actions/setup-dotnet`,
-   `NuGet/login`, etc.) move fast and this file will go stale. Before
-   generating `global.json`, `Directory.Build.props`, or any workflow,
-   web-search the current latest **LTS** .NET release and the latest major
-   version of each pinned action, and use those instead of any version
-   number written below.
-3. **Confirm the plan before generating or overwriting files** — list what
-   will be created/changed, group changes by category (below), and flag any
+   existing CI, existing docs) and diff it against the checklist — never
+   assume, inspect.
+3. **Verify what "latest stable" means today.** .NET LTS/STS cadence and
+   GitHub Action versions move fast, and every version written in this skill
+   will go stale. Run the bundled script from this skill's folder:
+
+   ```bash
+   python3 scripts/latest_versions.py
+   ```
+
+   It prints the current **LTS** .NET release and SDK, then compares every
+   action pinned in `templates/dot-github/workflows/` with its latest release
+   and flags outdated pins. Use its versions instead of any version written in
+   the templates. Add `--workflows <dir>` to check an existing repository's
+   workflows during an upgrade. If the script cannot reach the network,
+   web-search the same information instead.
+4. **Confirm the plan before generating or overwriting files** — list what
+   will be created/changed, group changes by checklist section, and flag any
    assumption (project type, single vs. multi-package, license already
    present, etc.) before writing anything. This matters most for an upgrade:
    never silently overwrite an existing `.editorconfig`, workflow, or
    `LICENSE` — show the diff intent first.
-4. For a **new** repo, confirm at minimum: package/namespace root name,
+5. For a **new** repo, confirm at minimum: package/namespace root name,
    single package or several related packages in one repo (AdCodicem's default
    is "one repo, several related packages" — e.g. `Core` / `Infrastructure` /
    client libs published as separate NuGet packages from one solution), and
@@ -40,168 +64,25 @@ than regenerating from scratch.
 
 ## Standards checklist
 
-### 1. Target framework & SDK
+Read the matching section of [references/standards.md](references/standards.md)
+before generating or changing the files it covers.
 
-- Target the current **latest stable LTS** release of .NET (verified per
-  step 2 above — do not hardcode from memory).
-- `global.json` pins the SDK with `rollForward: latestMinor` so patch/minor
-  SDK updates apply automatically without silently jumping major versions.
-- `LangVersion` = `latest`, `Nullable` = `enable`, `ImplicitUsings` = `enable`,
-  file-scoped namespaces, on every project via `Directory.Build.props` (see
-  `templates/Directory.Build.props`) — don't repeat these per-`.csproj`.
-
-### 2. Code style & quality
-
-- `.editorconfig` at repo root (`templates/.editorconfig`) — naming
-  conventions, `dotnet_diagnostic` severities, code-style-as-error in CI.
-- `EnableNETAnalyzers` + `AnalysisLevel=latest` in `Directory.Build.props`.
-- `dotnet format --verify-no-changes` runs in CI (not just locally) so style
-  drift fails the build, not just a local warning.
-- SonarCloud is opt-in per project (free for public repos) — ask whether
-  this specific repo warrants it (small CLI tool: usually skip; library with
-  real logic: usually worth it) rather than adding it everywhere by default.
-- Code, comments, commit messages, docs: **English**, per AdCodicem's global
-  preference — this applies inside every generated file, not just prose
-  Claude writes in chat.
-
-### 3. Tests
-
-- Unit tests: **xUnit**, one test project per source project
-  (`tests/Foo.Tests`), Coverlet for coverage, collected in CI.
-- Integration tests touching SQL Server: **Testcontainers**
-  (`Testcontainers.MsSql`) — spins up a real SQL Server container per test
-  run, no shared state, works identically on a dev machine and in GitHub
-  Actions (`ubuntu-latest` has Docker available natively).
-- Both suites run in `ci.yml` on every push/PR to `main`.
-
-### 4. Branching & commits
-
-- **GitHub Flow**: `main` is always releasable, short-lived feature
-  branches, PRs required (no direct pushes to `main`).
-- **Conventional Commits** enforced on PR titles/commits in CI (a
-  commitlint-style GitHub Action) — this is a hard dependency of the release
-  pipeline below, not a style nicety: semantic-release parses commit types
-  (`fix:`, `feat:`, `feat!:` / `BREAKING CHANGE:`) to compute the next
-  version. A malformed commit silently produces no release.
-
-### 5. Versioning & release — Conventional Commits + semantic-release
-
-- `.releaserc.json` (`templates/.releaserc.json`): `commit-analyzer` →
-  `release-notes-generator` → `changelog` (updates `CHANGELOG.md`) → `exec`
-  (runs `dotnet pack` with the computed version, then `dotnet nuget push`) →
-  `git` (commits the changelog + tags) → `github` (creates the GitHub
-  Release).
-- Runs from `release.yml`, triggered on push to `main` (i.e. after a PR
-  merges), Node-based tooling (`npx semantic-release`) even though the repo
-  is C# — this is normal, semantic-release doesn't touch your source, it
-  only orchestrates version + changelog + publish.
-- **Assumption to confirm on multi-package repos**: default is one unified
-  version number for the whole repo — every package bumps together and gets
-  published together, even if only one changed. Simpler, and fine for
-  tightly-coupled packages (e.g. `Core` + `Core.Extensions`). If two packages
-  in the same repo need to version independently, that needs
-  `multi-semantic-release` instead — flag this explicitly rather than
-  assuming, since it changes the release workflow shape.
-
-### 6. Publishing — NuGet trusted publishing
-
-- No stored `NUGET_API_KEY` secret. The workflow requests a GitHub OIDC
-  token (`id-token: write` permission), exchanges it for a short-lived
-  NuGet.org API key via the `NuGet/login` action, then `dotnet nuget push`
-  as normal.
-- **One-time manual step Claude cannot do for the user**: register the
-  trusted publisher on nuget.org (package → Manage → Trusted Publishers →
-  add the GitHub owner/repo/workflow filename). Always call this out
-  explicitly as a manual step, not something the generated files handle.
-
-### 7. Documentation — Docusaurus + generated API reference
-
-- `docs/website`: standard Docusaurus site for hand-written guides/concepts.
-- API reference is **generated, not hand-written**: DocFX's metadata step
-  extracts triple-slash XML comments from the source into YAML, which is
-  then converted to Markdown (DocFX's own experimental Markdown output, or
-  the `DocFxMarkdownGen` community tool) and dropped into a `docs/api/`
-  folder inside the Docusaurus source tree. Docusaurus then builds guides +
-  generated reference as one site.
-- `docs.yml` runs the DocFX metadata step, the Markdown conversion, then
-  `npm run build` in `docs/website`, then deploys to GitHub Pages.
-- `GenerateDocumentationFile=true` must be set in `Directory.Build.props` —
-  without it there are no XML doc comments for DocFX to extract.
-
-### 8. Dependency updates
-
-- Dependabot (`templates/.github/dependabot.yml`), three ecosystems:
-  `nuget` (source), `npm` (docs site), `github-actions` (workflow pins).
-  Weekly, grouped by minor/patch to avoid PR noise.
-
-### 9. Community & legal files
-
-- `LICENSE`: MIT by default (`templates/LICENSE`) — ask for the copyright
-  name/year to fill in, don't guess.
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant),
-  `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md`,
-  `.github/CODEOWNERS` — this repo is open to contributions, so these are
-  not optional the way they might be for a strictly-private repo.
-- `README.md`: generated per-project from `templates/README.template.md`,
-  not copied verbatim — quick start must get a new user to first success in
-  under 5 minutes, badges (build status, NuGet version, license) at the top.
-
-### 10. Security & supply-chain
-
-- `SECURITY.md` — points to GitHub's private vulnerability reporting
-  (Security tab → Report a vulnerability), not a public issue.
-- **CodeQL** (`codeql.yml`): static analysis on push/PR to `main` + weekly
-  schedule, results in the repo's Security tab.
-- **OpenSSF Scorecard** (`scorecards.yml`): weekly supply-chain health scan,
-  `publish_results: true` feeds the README badge
-  (`api.scorecard.dev/projects/github.com/{owner}/{repo}/badge`).
-- **Coverage** (Codecov): `ci.yml` uploads coverage via
-  `codecov/codecov-action@v5` — needs a `CODECOV_TOKEN` repo secret (see
-  manual steps below), don't rely on tokenless upload for the main branch.
-
-### 11. Repo automation (bots)
-
-- **Dependabot auto-merge** (`dependabot-auto-merge.yml`): merges
-  Dependabot PRs automatically unless the bump is a major version — a major
-  bump always needs a human look. Requires "Allow auto-merge" enabled in
-  repo settings (manual step below) and a required status check so it can't
-  merge a red build.
-- **Stale bot** (`stale.yml`): marks issues/PRs inactive after 60 days,
-  closes 14 days later unless labeled `pinned` (or `security` for issues).
-
-### 12. Extra docs
-
-- `ARCHITECTURE.md`: the "where do I start reading" map — project layout,
-  main moving parts, links out to ADRs for the reasoning.
-- `docs/adr/`: Architecture Decision Records (Nygard format) for
-  significant, hard-to-reverse decisions — not every decision, only ones a
-  future contributor would otherwise have to re-derive from git blame.
-- `samples/`: minimal runnable examples referencing `src/` directly (not
-  the published package), excluded from Pack/Publish.
-- `benchmarks/`: BenchmarkDotNet projects. Deliberately **not** run on every
-  CI push (noisy shared runners, slow) — manual `workflow_dispatch` only
-  (`benchmarks.yml`), or run locally before a release.
-
-### 13. Funding & community
-
-- `.github/FUNDING.yml`: GitHub Sponsors — only works once GitHub Sponsors
-  is actually enabled on the account (manual step below).
-- **GitHub Discussions**: a repo setting Claude can't toggle from files
-  (Settings → Features → Discussions) — flag it as a manual step when this
-  section is applied. `.github/DISCUSSION_TEMPLATE/q-a.yml` is scaffolded
-  ready for when it's on.
-
-### 14. API compatibility validation
-
-- `EnablePackageValidation=true` in `Directory.Build.props` fails the build
-  on an accidental breaking API change.
-- The baseline is **not** hardcoded — the release workflow passes
-  `-p:PackageValidationBaselineVersion=${lastRelease.version}` from
-  semantic-release itself, so it's always "compared against whatever we
-  last actually published." Empty/no-op on the very first release.
-- Consistent with the unified-versioning assumption in §5: since every
-  package in a multi-package repo shares the same previous version number,
-  one baseline value is correct for all of them.
+| § | Area | In short |
+| --- | --- | --- |
+| 1 | Target framework & SDK | Latest LTS, `global.json` with `rollForward: latestMinor`, shared settings in `Directory.Build.props` |
+| 2 | Code style & quality | `.editorconfig`, analyzers, `dotnet format` in CI, SonarCloud opt-in, American English everywhere |
+| 3 | Tests | xUnit + Coverlet, Testcontainers for SQL Server, both in `ci.yml` |
+| 4 | Branching & commits | GitHub Flow, Conventional Commits enforced in CI |
+| 5 | Versioning & release | semantic-release (`.releaserc.json`, `release.yml`), unified version by default |
+| 6 | Publishing | NuGet trusted publishing through OIDC, no stored API key |
+| 7 | Documentation | Docusaurus + API reference generated by DocFX |
+| 8 | Dependency updates | Dependabot for NuGet, npm and GitHub Actions, grouped minor/patch |
+| 9 | Community & legal files | MIT license, CONTRIBUTING, Code of Conduct, issue/PR templates, CODEOWNERS, README |
+| 10 | Security & supply chain | SECURITY.md, CodeQL, OpenSSF Scorecard, Codecov |
+| 11 | Repo automation | Dependabot auto-merge (never majors), stale bot |
+| 12 | Extra docs | ARCHITECTURE.md, ADRs, samples, benchmarks |
+| 13 | Funding & community | FUNDING.yml, GitHub Discussions |
+| 14 | API compatibility | `EnablePackageValidation` against the last published version |
 
 ## Manual one-time steps (Claude cannot do these)
 
@@ -223,24 +104,28 @@ whenever the relevant section is applied, don't let them get lost:
 
 1. Read the repo: solution/project layout, existing `.editorconfig` /
    workflows / docs if any.
-2. Produce a gap list against the checklist above, grouped by section
-   number, each tagged **add** / **change** / **already OK**.
+2. Produce a gap list against the checklist, grouped by section number, each
+   tagged **add** / **change** / **already OK**.
 3. Present the gap list and ask which sections to apply now vs. skip —
-   don't apply all nine sections unprompted on a repo that already has half
-   of them working differently; a wholesale rewrite of someone's existing
-   CI is a hard-to-reverse change.
+   don't apply every section unprompted on a repo that already has half of
+   them working differently; a wholesale rewrite of someone's existing CI is
+   a hard-to-reverse change.
 4. Apply section by section, committing to git in small reviewable chunks
    rather than one giant commit, so each change stays revertible.
 
 ## Files in this skill
 
 ```text
+references/
+  standards.md                  Full checklist, §1 to §14
+scripts/
+  latest_versions.py            Latest .NET LTS and GitHub Action versions
 templates/
-  .editorconfig
-  .gitignore
+  dot-editorconfig              -> .editorconfig
+  dot-gitignore                 -> .gitignore
+  dot-releaserc.json            -> .releaserc.json
   Directory.Build.props
   global.json
-  .releaserc.json
   commitlint.config.js
   docs/
     docfx/docfx.json
@@ -255,7 +140,7 @@ templates/
   LICENSE
   samples/README.md
   benchmarks/README.md
-  .github/
+  dot-github/                   -> .github/
     dependabot.yml
     CODEOWNERS
     FUNDING.yml
