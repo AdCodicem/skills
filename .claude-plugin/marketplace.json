@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "adcodicem",
+  "owner": {
+    "name": "AdCodicem",
+    "url": "https://github.com/AdCodicem"
+  },
+  "description": "AdCodicem's personal Claude Code plugins: skills, subagents, hooks and MCP servers.",
+  "plugins": [
+    {
+      "name": "dotnet",
+      "source": "./plugins/dotnet",
+      "description": "Skills for .NET development: scaffold and upgrade personal open-source .NET repositories to a standard toolchain.",
+      "category": "development",
+      "tags": ["dotnet", "csharp", "scaffolding", "ci-cd"]
+    }
+  ]
+}

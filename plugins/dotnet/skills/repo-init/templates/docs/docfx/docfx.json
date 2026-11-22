@@ -1,0 +1,24 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../../src",
+          "files": ["**/*.csproj"]
+        }
+      ],
+      "dest": "api",
+      "outputFormat": "markdown"
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": ["api/**.md"],
+        "dest": "."
+      }
+    ],
+    "dest": "../website/docs/api",
+    "markdownEngineName": "markdig"
+  }
+}

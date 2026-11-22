@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "dotnet",
+  "version": "1.0.0",
+  "description": "Skills for .NET development: scaffold and upgrade personal open-source .NET repositories to a standard toolchain.",
+  "author": {
+    "name": "AdCodicem",
+    "url": "https://github.com/AdCodicem"
+  },
+  "homepage": "https://github.com/AdCodicem/skills/tree/main/plugins/dotnet",
+  "repository": "https://github.com/AdCodicem/skills",
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "csharp",
+    "scaffolding",
+    "ci-cd"
+  ]
+}
