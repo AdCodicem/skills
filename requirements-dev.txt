@@ -1,0 +1,4 @@
+# Repository tooling only. Skill and hook scripts must stay standard-library only.
+pytest==9.2.0
+pyyaml==6.0.4
+ruff==0.17.6
