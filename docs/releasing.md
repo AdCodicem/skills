@@ -12,10 +12,15 @@ There is nothing to run by hand.
    bumps `version` in `plugins/<plugin>/.claude-plugin/plugin.json` and updates
    `plugins/<plugin>/CHANGELOG.md`.
 3. Merging a release PR tags `<plugin>-v<version>` (for example `dotnet-v1.1.0`)
-   and creates the GitHub release.
+   and creates the GitHub release as a draft.
 4. The same workflow then:
    - packages the plugin's portable skills and attaches `<plugin>-<skill>.zip`
      files to the release, for claude.ai uploads;
+   - publishes the release. The repository has immutable releases enabled, so
+     files cannot be attached once a release is published: that is why
+     release-please creates drafts (`draft` and `force-tag-creation` in
+     `release-please-config.json`). If the job fails, the release stays a
+     draft; fix the cause and re-run the failed job;
    - uploads skills that target `api` to the Claude API (`/v1/skills`): a new
      version when a custom skill with the same name exists, a new skill
      otherwise. Skipped when the `ANTHROPIC_API_KEY` secret is not set.
@@ -51,6 +56,8 @@ These settings cannot be committed. Apply them once in the repository settings:
   `Test (windows-latest)`, `Package skills`, `Conventional Commit title`.
 - **Actions > General**: allow GitHub Actions to create and approve pull
   requests (release-please opens PRs).
+- **General > Releases**: immutable releases can stay enabled; the Release
+  workflow publishes each release only after attaching its files.
 - **Secrets > Actions** (optional):
   - `RELEASE_PLEASE_TOKEN`: a fine-grained token with contents and pull
     requests write access. Without it, release PRs are opened with

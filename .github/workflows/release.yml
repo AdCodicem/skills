@@ -30,6 +30,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  # If this job fails, the release stays a draft: fix the cause and re-run it.
   publish:
     name: Publish ${{ matrix.path }}
     needs: release-please
@@ -67,6 +68,13 @@ jobs:
           else
             gh release upload "$TAG" "${zips[@]}" --clobber
           fi
+      # release-please creates draft releases (see release-please-config.json):
+      # with immutable releases on, assets cannot be added once a release is
+      # published, so publish it only after the zips are attached.
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$TAG" --draft=false
       - name: Upload API skills
         if: env.ANTHROPIC_API_KEY != ''
         run: python scripts/upload_skills.py --dist dist
