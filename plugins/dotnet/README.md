@@ -32,6 +32,7 @@ Skills for .NET development, in two groups:
 | Skill | `/dotnet:tooling` | Claude Code | SDK 10/11: file-based apps, `.slnx`, Microsoft.Testing.Platform, NuGet audit and pruning, CPM |
 | Skill | `/dotnet:migrate` | Claude Code | Upgrade a solution to .NET 10 or 11 and work through the breaking changes |
 | Agent | `modernization-auditor` | Claude Code | Read-only audit of a codebase: modernization, obsolete APIs, upgrade risks |
+| Hook | `UserPromptSubmit` | Claude Code, Cowork | For .NET requests, reminds Claude which of the skills above to load, even for short snippets |
 | Skill | `/dotnet:repo-init` | Claude Code, claude.ai | Scaffold or upgrade a personal open-source .NET repository |
 
 On claude.ai the skill is named `dotnet-repo-init`: download
@@ -57,6 +58,10 @@ explicit requests:
 
 How they behave:
 
+- **Reliable triggering**: skill descriptions alone are often skipped for short
+  "code only" requests, so a `UserPromptSubmit` hook adds a one-paragraph
+  reminder naming the matching skills when the prompt mentions .NET or the
+  session runs in a .NET repository. It adds nothing to other prompts.
 - **Target first**: `skills/csharp/scripts/detect_target.py` reports each
   project's target frameworks, effective C# version, preview opt-ins, SDK pin,
   and ASP.NET Core, EF Core and test stacks (`--evaluate` asks MSBuild for the
@@ -92,9 +97,11 @@ an existing repository the same way.
 
 ## Requirements
 
-- Python 3 (standard library only) for `detect_target.py` and
-  `latest_versions.py`. On Windows, `python3` may not exist: the skills fall
-  back to `python`.
+- Python 3 (standard library only) for `detect_target.py`, `latest_versions.py`
+  and the hook. On Windows, `python3` may be the Microsoft Store stub: the skills
+  fall back to `python`, and the hook command tries `python3`, `python` then `py`
+  through `sh` (Git Bash). Without Git Bash the hook does nothing and the skills
+  rely on their descriptions alone.
 - The .NET SDK for `detect_target.py --evaluate` and to build and test the code.
 - Optional: the [Microsoft Learn MCP server](https://github.com/MicrosoftDocs/mcp)
   to verify details that the bundled references do not cover.
