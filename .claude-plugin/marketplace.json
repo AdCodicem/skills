@@ -10,9 +10,9 @@
     {
       "name": "dotnet",
       "source": "./plugins/dotnet",
-      "description": "Skills for .NET development: scaffold and upgrade personal open-source .NET repositories to a standard toolchain.",
+      "description": "Skills for .NET development: modern C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK) for writing, reviewing, modernizing and upgrading code, plus repository scaffolding.",
       "category": "development",
-      "tags": ["dotnet", "csharp", "scaffolding", "ci-cd"]
+      "tags": ["dotnet", "csharp", "aspnetcore", "efcore", "modernization", "scaffolding", "ci-cd"]
     }
   ]
 }

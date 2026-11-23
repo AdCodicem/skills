@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings: bash fails on CRLF (eval scaffold scripts, hooks).
+*.sh text eol=lf

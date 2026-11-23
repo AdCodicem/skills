@@ -1,0 +1,16 @@
+{
+  "description": "Reminds Claude to load the dotnet plugin skills for .NET requests.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'for p in python3 python py; do \"$p\" -c \"\" </dev/null >/dev/null 2>&1 && exec \"$p\" \"$0\"; done; exit 0' \"${CLAUDE_PLUGIN_ROOT}/hooks/dotnet_skill_hint.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
