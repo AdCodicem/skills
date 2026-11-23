@@ -37,6 +37,10 @@ env -u ANTHROPIC_API_KEY claude plugin eval plugins/<plugin>
 env -u ANTHROPIC_API_KEY claude plugin eval plugins/<plugin> --ablation none --runs 1 --case <case>
 ```
 
+Cases whose `case.yaml` sets `context.scaffold_script` (a Bash script that writes
+fixture files into the run's working directory) need `--scaffold`; without it they
+run in an empty directory and fail. On Windows the script runs with Git Bash.
+
 Results land in `plugins/<plugin>/evals/results/<timestamp>/` (git-ignored):
 `report.html` and `aggregate-result.json`. Summarize for the user: score per
 case, the with/without delta, and failing graders with their reason.
