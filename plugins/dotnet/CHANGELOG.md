@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/AdCodicem/skills/compare/dotnet-v1.0.0...dotnet-v1.0.1) (2026-11-23)
+
+
+### Documentation
+
+* **dotnet:** link the claude.ai zip to the dotnet releases ([#4](https://github.com/AdCodicem/skills/issues/4)) ([02e8741](https://github.com/AdCodicem/skills/commit/02e8741bf1a66d3e3d7ba68dfd2866c64470d667))
+
 ## 1.0.0 (2026-11-23)
 
 
