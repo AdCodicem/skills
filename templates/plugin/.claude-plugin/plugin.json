@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "{{PLUGIN_NAME}}",
+  "version": "0.1.0",
+  "description": "{{PLUGIN_DESCRIPTION}}",
+  "author": {
+    "name": "AdCodicem",
+    "url": "https://github.com/AdCodicem"
+  },
+  "homepage": "https://github.com/AdCodicem/skills/tree/main/plugins/{{PLUGIN_NAME}}",
+  "repository": "https://github.com/AdCodicem/skills",
+  "license": "MIT",
+  "keywords": {{PLUGIN_KEYWORDS}}
+}

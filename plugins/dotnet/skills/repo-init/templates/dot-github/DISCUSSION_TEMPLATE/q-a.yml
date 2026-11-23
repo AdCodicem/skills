@@ -1,0 +1,18 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about using this project? Search existing
+        discussions first — someone may have already asked.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do, and what's not working or unclear?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version

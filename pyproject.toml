@@ -1,0 +1,19 @@
+# Tooling configuration only: this repository is not a Python package.
+[project]
+name = "adcodicem-skills-tooling"
+version = "0.0.0"
+description = "Repository tooling for the AdCodicem Claude Code plugin marketplace."
+requires-python = ">=3.11"
+
+[tool.ruff]
+# Skill scripts must run on the Claude API code execution container (Python 3.11).
+target-version = "py311"
+line-length = 100
+extend-exclude = ["templates"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "PTH"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "plugins", "examples"]
+addopts = "--import-mode=importlib"

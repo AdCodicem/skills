@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Verify actions/setup-dotnet is still the current major version before reusing this file
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Verify code style
+        run: dotnet format --verify-no-changes --no-restore
+
+      # Integration tests use Testcontainers (Testcontainers.MsSql) — needs Docker,
+      # which ubuntu-latest runners provide natively, no extra setup required.
+      - name: Test
+        run: >
+          dotnet test --configuration Release --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # repo secret, see SKILL.md §10 manual steps
+          directory: ./coverage
+          fail_ci_if_error: false
+
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Lint PR commits (Conventional Commits)
+        uses: wagoid/commitlint-github-action@v6

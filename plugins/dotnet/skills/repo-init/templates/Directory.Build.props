@@ -1,0 +1,39 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Verify this is still the current stable LTS before scaffolding — see SKILL.md step 2 -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WarningsAsErrors Condition="'$(Configuration)' == 'Release'">Nullable</WarningsAsErrors>
+
+    <!-- Analyzers -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Required for DocFX to extract API reference from XML doc comments -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn> <!-- missing XML comment: warn only on public library projects, not everywhere -->
+
+    <!-- Fails the build on accidental breaking API changes vs. the previous release.
+         Baseline is passed as PackageValidationBaselineVersion by the release workflow
+         (= semantic-release's ${lastRelease.version}) — empty/no-op on the first release. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+
+    <!-- NuGet package metadata (publishable projects only — set PackAsTool/IsPackable per-project as needed) -->
+    <Authors>AdCodicem</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Version is injected at pack time by semantic-release via -p:Version=... — see .releaserc.json -->
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+  </PropertyGroup>
+
+</Project>

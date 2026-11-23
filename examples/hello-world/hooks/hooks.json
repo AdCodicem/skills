@@ -1,0 +1,17 @@
+{
+  "description": "Blocks force pushes to main or master.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block_force_push.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

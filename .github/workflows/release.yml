@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release PRs and tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      all: ${{ toJSON(steps.release.outputs) }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          # A PAT or GitHub App token lets CI run on release PRs; GITHUB_TOKEN
+          # works but GitHub does not trigger workflows on the PRs it opens.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  publish:
+    name: Publish ${{ matrix.path }}
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        path: ${{ fromJSON(needs.release-please.outputs.paths_released) }}
+    env:
+      PLUGIN_PATH: ${{ matrix.path }}
+      TAG: ${{ fromJSON(needs.release-please.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Package portable skills
+        run: python scripts/package_skills.py --plugin "$(basename "$PLUGIN_PATH")" --out dist
+      - name: Attach zips to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          zips=(dist/*.zip)
+          if [ ${#zips[@]} -eq 0 ]; then
+            echo "No portable skill in $PLUGIN_PATH: nothing to attach."
+          else
+            gh release upload "$TAG" "${zips[@]}" --clobber
+          fi
+      - name: Upload API skills
+        if: env.ANTHROPIC_API_KEY != ''
+        run: python scripts/upload_skills.py --dist dist
