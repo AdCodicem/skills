@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/AdCodicem/skills/compare/dotnet-v1.0.1...dotnet-v1.1.0) (2026-11-23)
+
+
+### Features
+
+* **dotnet:** add modern C# and .NET 10/11 skills ([#6](https://github.com/AdCodicem/skills/issues/6)) ([51162f8](https://github.com/AdCodicem/skills/commit/51162f8b24d1711ee5c4bf4a0b0da6440718218c))
+
 ## [1.0.1](https://github.com/AdCodicem/skills/compare/dotnet-v1.0.0...dotnet-v1.0.1) (2026-11-23)
 
 
