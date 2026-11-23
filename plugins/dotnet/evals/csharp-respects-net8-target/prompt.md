@@ -1,5 +1,5 @@
 ---
-description: csharp keeps to C# 12 on a net8.0 project: no field keyword, a classic backing field.
+description: csharp keeps to C# 12 on a net8.0 project, with a classic backing field instead of the field keyword.
 max_turns: 12
 allowed_tools: [Skill, Read, Glob, Grep]
 ---
