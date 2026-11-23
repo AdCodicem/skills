@@ -20,8 +20,10 @@ docs with a generated API reference, CodeQL, Scorecard and Dependabot.
 | Skill | `/dotnet:repo-init` | Claude Code, claude.ai | Scaffold or upgrade a personal open-source .NET repository |
 
 On claude.ai the skill is named `dotnet-repo-init`: download
-`dotnet-repo-init.zip` from the latest `dotnet-v*` GitHub release and upload it
-under Customize > Skills.
+`dotnet-repo-init.zip` from the latest
+[`dotnet-v*` GitHub release](https://github.com/AdCodicem/skills/releases?q=dotnet-v&expanded=true)
+and upload it under Customize > Skills. Releases from 1.0.1 onward include the
+zip.
 
 ## Usage
 
