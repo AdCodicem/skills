@@ -58,7 +58,7 @@ LTS; .NET 11 is STS (GA 2026-11-10). .NET 8 and 9 are out of support.
 | JSON array for streamed records | `JsonSerializer.SerializeAsyncEnumerable(stream, items, topLevelValues: true)` (JSON Lines) | .NET 11 |
 | `System.Linq.Async` package, `SelectAwait` | In-box `System.Linq.AsyncEnumerable`: `Select(async (T x, CancellationToken ct) => ...)` with explicit parameter types | .NET 10 |
 | `GroupJoin` + `SelectMany` + `DefaultIfEmpty` | `LeftJoin` / `RightJoin`; `FullJoin` and tuple overloads | .NET 10 / 11 |
-| Hand-written `IEqualityComparer<T>` class | `EqualityComparer<T>.Create(x => x.Key, StringComparer.OrdinalIgnoreCase)` | .NET 11 |
+| Hand-written `IEqualityComparer<T>` class | `EqualityComparer<T>.Create(x => x?.Key, StringComparer.OrdinalIgnoreCase)` (the selector gets `T?`) | .NET 11 |
 | Natural-sort comparer | `StringComparer.Create(culture, CompareOptions.NumericOrdering)` | .NET 10 |
 | `new Rfc2898DeriveBytes(...)` + `GetBytes` | `Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32)` | .NET 10 (SYSLIB0060) |
 | `Find(X509FindType.FindByThumbprint, ...)` (SHA-1) | `FindByThumbprint(HashAlgorithmName.SHA256, thumbprint)` | .NET 10 |

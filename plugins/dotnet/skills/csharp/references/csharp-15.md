@@ -1,6 +1,7 @@
 # C# 15 (.NET 11, November 2026)
 
 Default on `net11.0`. Everything here is GA except memory safety (preview).
+The GA examples below were compiled and run against SDK 11.0.100.
 Sources: [What's new in C# 15](https://learn.microsoft.com/dotnet/csharp/whats-new/csharp-15),
 [.NET 11 compiler breaking changes](https://learn.microsoft.com/dotnet/csharp/whats-new/breaking-changes/compiler%20breaking%20changes%20-%20dotnet%2011).
 
@@ -34,10 +35,11 @@ feature-status page "C# 15.0" section):
   // After
   HashSet<string> set = [with(StringComparer.OrdinalIgnoreCase), "a", "A"];   // 1 element
   List<string> list = [with(capacity: values.Length * 2), .. values];
-  IDictionary<string, int> map = [with(StringComparer.Ordinal)];               // new Dictionary<,>(comparer)
+  Dictionary<string, int> map = [with(StringComparer.Ordinal)];                // concrete type only
+  IList<string> items = [with(capacity: 4), "z"];                              // List<string>(4)
   ```
 
-- **Rules:** Arrays and spans reject `with(...)` (even empty). Interfaces get a curated set: `IList<T>`/`ICollection<T>` → `List<T>()`/`List<T>(int)`; `IReadOnlyDictionary<K,V>` → `()` or `(IEqualityComparer<K>?)`; `IDictionary<K,V>` → the `Dictionary<K,V>` ctor shapes; `IEnumerable<T>`/`IReadOnlyList<T>` → `()` only. No `dynamic` args. Arguments are ignored for conversion and type inference (can't use `with` to disambiguate overloads). Types whose only constructors require arguments become usable with collection expressions if `with(...)` is present.
+- **Rules:** Arrays and spans reject `with(...)` (even empty). Interfaces get a curated set: `IList<T>`/`ICollection<T>` → `List<T>()`/`List<T>(int)`; `IEnumerable<T>`/`IReadOnlyList<T>` → `()` only. **Dictionary interfaces are not collection expression targets** in C# 15 (`IDictionary<K,V>` / `IReadOnlyDictionary<K,V>` give CS9174 on SDK 11.0.100, even though the proposal lists them): target `Dictionary<K,V>` instead. No `dynamic` args. Arguments are ignored for conversion and type inference (can't use `with` to disambiguate overloads). Types whose only constructors require arguments become usable with collection expressions if `with(...)` is present.
 - **Breaking change:** In C# 15, `[with(x, y)]` is parsed as arguments, not a call to a method named `with`; use `@with(...)`.
 - **When to use:** Comparers for sets/dictionaries (correctness: case-insensitive keys), capacity hints for large spreads.
 - **When not:** `with()` with no args adds noise. Wanting dictionary literal syntax (`["a": 1]`) is dictionary expressions, which did **not** ship.

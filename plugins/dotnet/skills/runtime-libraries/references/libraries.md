@@ -4,8 +4,9 @@ Status: **GA** = supported; **Experimental** = `[Experimental("SYSLIB5xxx")]`, a
 compile error until suppressed; **Opt-in** = shipped but off by default. Sources:
 [.NET 10 libraries](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-10/libraries),
 [.NET 11 libraries](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-11/libraries).
-The .NET 10 APIs below were compiled against SDK 10.0.404; the .NET 11 ones come
-from the documentation.
+The main .NET 10 APIs below were compiled against SDK 10.0.404, and the main
+.NET 11 ones (comparers, joins, streams, Process, JSON Lines, X25519, key wrap,
+Zstandard, Base64, regex) against SDK 11.0.100.
 
 ## System.Text.Json
 
@@ -60,7 +61,8 @@ Prefer source-generated contexts (`JsonSerializerContext`) for AOT/trimming; set
 ```csharp
 // Old: custom IEqualityComparer<Person> class
 // .NET 11
-var byName = EqualityComparer<Person>.Create(p => p.Name, StringComparer.OrdinalIgnoreCase);
+// The key selector receives T?: `p => p.Name` warns CS8602 with nullable enabled.
+var byName = EqualityComparer<Person>.Create(p => p?.Name, StringComparer.OrdinalIgnoreCase);
 var set = new HashSet<Person>(byName);
 ```
 

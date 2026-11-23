@@ -76,7 +76,7 @@ the target detection script used by the other skills of this plugin
 | `nameof(List<int>)` | `nameof(List<>)` | 14 | Logging, messages, attributes |
 | `(string s, out int r) => ...` | `(s, out r) => ...` | 14 | Delegates with `ref`/`out`/`in`/`scoped` parameters |
 | Binary operator allocating a new big mutable object for `+=` | Instance `void operator +=(T)` and `operator ++()` | 14 | Buffers, tensors, builders. Keep it semantically equal to `+` |
-| `new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ... }` | `[with(StringComparer.OrdinalIgnoreCase), "a", "b"]` | 15 | Comparers and capacity with collection expressions |
+| `new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ... }` | `[with(StringComparer.OrdinalIgnoreCase), "a", "b"]` | 15 | Comparers and capacity. Concrete types only for dictionaries: `IDictionary`/`IReadOnlyDictionary` targets do not compile |
 | Marker interface + `_ => throw` arm to emulate "one of" | `union Result(Success, Error);` and an exhaustive `switch` with a `null` arm | 15 | Unrelated or foreign case types, result types |
 | `abstract record` base + discard arm | `closed record Shape;` + `sealed` subtypes, exhaustive `switch` without `_` | 15 | Related types you own with shared members |
 | Extension `ElementAt`-style method | Extension indexer in an `extension` block | 15 | Cheap (O(1)) indexing only |

@@ -68,7 +68,7 @@ are out of support. Blazor components are out of scope.
 | Newtonsoft JSON Patch + `AddNewtonsoftJson` | `Microsoft.AspNetCore.JsonPatch.SystemTextJson` on a DTO | 10 |
 | Custom WebAuthn library with Identity | Identity passkeys (`IdentitySchemaVersions.Version3`, explicit `ServerDomain`) | 10 |
 | Token antiforgery only, for form posts | Automatic CSRF (header based), on by default; CORS with explicit origins and `AllowCredentials` for trusted cross-origin callers | 11 |
-| `UseConcurrencyLimiter` | `AddRateLimiter(o => o.AddConcurrencyLimiter(...))` + `UseRateLimiter()` | 7 (required in 11) |
+| `UseConcurrencyLimiter` | `AddRateLimiter(o => o.AddConcurrencyLimiter(...))` (namespace `Microsoft.AspNetCore.RateLimiting`) + `UseRateLimiter()` | 7 (required in 11) |
 | `OpenTelemetry.Instrumentation.AspNetCore` for HTTP spans | `AddSource("Microsoft.AspNetCore")` | 11 |
 | `.ShortCircuit()` chains for health or robots endpoints | `[ShortCircuit]` attribute | 11 |
 | Manual `Url.IsLocalUrl` checks in Minimal APIs | `RedirectHttpResult.IsLocalUrl(url)` before redirecting | 10 |

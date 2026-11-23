@@ -1,6 +1,9 @@
 # ASP.NET Core 11 (November 2026, STS)
 
-GA on 2026-11-10; items are GA unless marked **experimental**. The Learn page may
+GA on 2026-11-10; items are GA unless marked **experimental**. The validation,
+`[ShortCircuit]`, union, `QUERY`, SignalR, Zstandard and rate limiting examples
+were compiled against SDK 11.0.100; automatic CSRF was checked at runtime
+(cross-site form post: 400; same-origin or no browser headers: 200). The Learn page may
 still mention previews: that wording is stale. Main sources:
 [What's new in ASP.NET Core 11](https://learn.microsoft.com/aspnet/core/release-notes/aspnetcore-11?view=aspnetcore-11.0),
 [migrating from 10 to 11](https://learn.microsoft.com/aspnet/core/migration/100-to-110?view=aspnetcore-11.0).
