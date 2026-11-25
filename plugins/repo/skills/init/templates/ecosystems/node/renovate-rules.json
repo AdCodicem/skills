@@ -1,0 +1,20 @@
+{
+  "packageRules": [
+    {
+      "description": "engines.node is a support policy (the oldest maintained LTS line), changed by a person when a line reaches end of life, never by a bot.",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["engines"],
+      "enabled": false
+    },
+    {
+      "description": "The two TypeScript compilers (6.0 for tools, 7 native for tsc) move together.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "typescript",
+        "@typescript/native",
+        "@typescript/typescript6"
+      ],
+      "groupName": "TypeScript"
+    }
+  ]
+}

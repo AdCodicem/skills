@@ -1,0 +1,233 @@
+name: release
+
+# Merging publishes nothing. A stable release is this workflow, dispatched from
+# main and approved in the `release` environment:
+#
+#   plan     the next version (next-version.mjs), or nothing to release
+#   verify   ci.yml, the very jobs of every pull request
+#   pack     each module's release-pack.yml steps, without any credential
+#   publish  in `release`: digests checked, files attested, semantic-release
+#            (tag, changelog commit, draft release), each module's
+#            release-publish.yml steps, then the draft is published
+#
+# Builds and tests never share a job with a credential; the publish job builds
+# nothing and refuses files whose digest changed since pack. Rerunning a failed
+# publish job resumes it: semantic-release is skipped once its tag exists, the
+# registries skip what they already have, and the draft is published last.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Show the next version and its commits, publish nothing
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      last_tag: ${{ steps.version.outputs.last_tag }}
+      last_version: ${{ steps.version.outputs.last_version }}
+      release_type: ${{ steps.version.outputs.release_type }}
+      next_version: ${{ steps.version.outputs.next_version }}
+      height: ${{ steps.version.outputs.height }}
+    steps:
+      - name: Refuse any branch but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Dispatch release.yml from main."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          package-manager-cache: false # no cache where a release is made
+
+      - run: npm ci --ignore-scripts
+
+      - id: version
+        run: node .github/scripts/next-version.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        env:
+          LAST_TAG: ${{ steps.version.outputs.last_tag }}
+          RELEASE_TYPE: ${{ steps.version.outputs.release_type }}
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+        run: |
+          if [ -z "$RELEASE_TYPE" ]; then
+            echo "Nothing to release since $LAST_TAG: no feat, fix, perf or breaking commit." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "## Next release: $NEXT_VERSION ($RELEASE_TYPE)"
+            echo
+            echo "Commits since $LAST_TAG:"
+            echo
+            git log --format='- %s' "$LAST_TAG..HEAD"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: verify
+    needs: plan
+    if: needs.plan.outputs.release_type != '' && !inputs.dry_run
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      id-token: write # tokenless coverage upload, when ci.yml has it
+
+  pack:
+    name: pack
+    needs: [plan, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.plan.outputs.next_version }}
+      LAST_VERSION: ${{ needs.plan.outputs.last_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Paste each module's release-pack.yml steps here. Each one stamps
+      # $VERSION and writes its files under dist/<registry>/. No cache in this
+      # job: a poisoned cache must never reach a release.
+
+      - name: Digests
+        run: |
+          find dist -mindepth 2 -maxdepth 2 -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256
+          cat dist.sha256
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          # One folder per registry; dist.sha256 keeps dist/ at the artifact root.
+          path: |
+            dist.sha256
+            dist/*/*
+          if-no-files-found: error
+          retention-days: 7
+
+  # Applications: paste the jobs of templates/deploy/release-jobs.yml here and
+  # add `deploy-production` to publish.needs, so the tag records what runs.
+
+  publish:
+    name: publish
+    needs: [plan, pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # trusted publishing and attestations
+      attestations: write
+    env:
+      VERSION: ${{ needs.plan.outputs.next_version }}
+      TAG: v${{ needs.plan.outputs.next_version }}
+    steps:
+      - name: Release token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@v7
+        with:
+          # semantic-release reads every tag to find the last release, and
+          # pushes with the App token it is given, not a stored credential.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+
+      - name: Refuse files changed since pack
+        run: sha256sum --check dist.sha256
+
+      # Attestations need a public repository or Enterprise Cloud: on
+      # Enterprise Cloud, remove the condition.
+      - name: Attest
+        id: attest
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*/*
+
+      - name: Keep the attestation bundle with the release
+        if: steps.attest.outcome == 'success'
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          mkdir -p dist/attestations
+          cp "$BUNDLE" "dist/attestations/${GITHUB_REPOSITORY#*/}-${VERSION}.sigstore.json"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          package-manager-cache: false # no cache where a release is made
+
+      - run: npm ci --ignore-scripts
+
+      - name: Does the release exist already?
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG exists: resuming after semantic-release."
+          fi
+
+      - name: semantic-release
+        if: steps.existing.outputs.found != 'true'
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          PACKED_VERSION: ${{ needs.plan.outputs.next_version }}
+
+      - name: The draft exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft'
+
+      # Paste each module's release-publish.yml steps here: OIDC login and an
+      # idempotent push to the registry. They build nothing.
+
+      # Publishing is the last write: an immutable release cannot change once
+      # it is public, so every file is on the draft first.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+
+  # Complete tier: publish the documentation of the new version.
+  # docs:
+  #   name: docs
+  #   needs: [plan, publish]
+  #   uses: ./.github/workflows/docs.yml
+  #   with:
+  #     ref: v${{ needs.plan.outputs.next_version }}
+  #   permissions:
+  #     contents: read
+  #     pages: write
+  #     id-token: write

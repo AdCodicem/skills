@@ -1,0 +1,106 @@
+name: deploy
+
+# GitHub Pages target: builds the static site at a commit or tag and publishes
+# it. Pages serves one site per repository, so it is production only: the
+# release calls this workflow, and a dispatch with an older tag rolls back.
+# Copy to .github/workflows/deploy.yml.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Must be production; Pages has no staging.
+        type: string
+        required: true
+      ref:
+        description: Commit or tag to build.
+        type: string
+        required: true
+      version:
+        description: Version label shown in the build (VITE_APP_VERSION).
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [production]
+        default: production
+      ref:
+        description: Tag to deploy, for example v1.4.2; an older tag rolls back.
+        type: string
+        required: true
+      version:
+        description: Version label, for example 1.4.2.
+        type: string
+        required: true
+
+permissions: {}
+
+# Never cancel a deployment in progress: queue the next one.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Refuse anything but production
+        if: inputs.environment != 'production'
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          echo "::error::GitHub Pages serves production only, not '$ENVIRONMENT'."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The React module's build (references/ecosystems/react.md). It must
+      # leave the static site in dist/.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+
+      # A project site lives under /<repository>/: configure-pages gives the
+      # base path, empty for a custom domain or a user site.
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Build
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          VITE_APP_VERSION: ${{ inputs.version }}
+        run: pnpm exec vite build --base "${BASE_PATH}/"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Smoke check
+        env:
+          URL: ${{ steps.deployment.outputs.page_url }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors --output /dev/null "$URL"

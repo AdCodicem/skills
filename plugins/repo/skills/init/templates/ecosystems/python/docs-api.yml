@@ -1,0 +1,16 @@
+# Fragment: steps that run before the Docusaurus build, in the CI job that builds the site and
+# in docs.yml. griffe2md reads the source statically (nothing is imported) and writes one
+# Markdown page. The page holds HTML and braces: the site needs `markdown: { format: "detect" }`
+# in docusaurus.config.ts, so `.md` files are read as CommonMark, not MDX.
+steps:
+  - uses: astral-sh/setup-uv@v10.4.0
+    with:
+      enable-cache: false
+  - name: Generate the Python API reference
+    run: |
+      out=docs/website/docs/reference/api
+      mkdir -p "$out"
+      {
+        printf -- '---\ntitle: Python API\nsidebar_label: Python API\n---\n\n'
+        uv run --locked --only-group docs griffe2md src/{{package}}
+      } > "$out/{{package}}.md"

@@ -1,0 +1,138 @@
+name: deploy
+
+# Azure App Service target: publishes the application at a commit or tag and
+# deploys it with OIDC (no publish profile). With deployment slots (Standard
+# tier and up), each environment deploys to a slot; production deploys to the
+# `release` slot, is smoke-checked there, then swapped into production, so the
+# previous version stays one swap away. Copy to .github/workflows/deploy.yml.
+#
+# Variables of each GitHub environment (identifiers, not secrets):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#   AZURE_RESOURCE_GROUP, AZURE_WEBAPP_NAME,
+#   AZURE_WEBAPP_SLOT   staging: `staging`; production: `release`; empty
+#                       without slots (deploys straight to production)
+#   AZURE_WEBAPP_SWAP   `true` on production with slots: swap `release` into
+#                       production after the smoke check
+#
+# Web App for Containers: replace the `package` input of webapps-deploy with
+# `images: ghcr.io/{{owner}}/{{repo}}:sha-<commit>` and drop the build job
+# (container.yml builds the image).
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: staging or production.
+        type: string
+        required: true
+      ref:
+        description: Commit or tag to publish.
+        type: string
+        required: true
+      version:
+        description: Version stamped into the build.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        default: production
+      ref:
+        description: Tag or commit to deploy; an older tag rolls back.
+        type: string
+        required: true
+      version:
+        description: Version, for example 1.4.2.
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The ecosystem's publish steps (references/ecosystems/*.md). They must
+      # leave the deployable application in app/. .NET shown.
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Publish
+        env:
+          VERSION: ${{ inputs.version }}
+        run: dotnet publish src/{{project}} --configuration Release --output app "-p:Version=$VERSION"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app
+          path: app
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.url.outputs.url }}
+    env:
+      GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP: ${{ vars.AZURE_WEBAPP_NAME }}
+      SLOT: ${{ vars.AZURE_WEBAPP_SLOT }}
+      SWAP: ${{ vars.AZURE_WEBAPP_SWAP }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: app
+          path: app
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          slot-name: ${{ vars.AZURE_WEBAPP_SLOT || 'production' }}
+          package: app
+
+      - name: Smoke check the deployed slot
+        run: |
+          if [ -n "$SLOT" ]; then
+            host=$(az webapp show --name "$APP" --resource-group "$GROUP" --slot "$SLOT" --query defaultHostName --output tsv)
+          else
+            host=$(az webapp show --name "$APP" --resource-group "$GROUP" --query defaultHostName --output tsv)
+          fi
+          curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors --output /dev/null "https://$host"
+
+      - name: Swap into production
+        if: env.SWAP == 'true'
+        run: az webapp deployment slot swap --name "$APP" --resource-group "$GROUP" --slot "$SLOT" --target-slot production
+
+      - name: Environment URL
+        id: url
+        run: |
+          if [ -n "$SLOT" ] && [ "$SWAP" != "true" ]; then
+            host=$(az webapp show --name "$APP" --resource-group "$GROUP" --slot "$SLOT" --query defaultHostName --output tsv)
+          else
+            host=$(az webapp show --name "$APP" --resource-group "$GROUP" --query defaultHostName --output tsv)
+          fi
+          echo "url=https://$host" >> "$GITHUB_OUTPUT"

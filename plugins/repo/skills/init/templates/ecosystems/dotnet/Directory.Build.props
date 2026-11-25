@@ -1,0 +1,86 @@
+<Project>
+
+  <!--
+    Settings shared by every project of the repository. A project repeats none of
+    them; it sets only what is its own (IsPackable, PackageId, OutputType).
+  -->
+
+  <PropertyGroup Label="Language and analysis">
+    <!--
+      A library targets the oldest .NET still supported (widest reach), an
+      application the latest. The C# version follows the target framework: no
+      LangVersion here, so code never uses features its runtime does not support.
+    -->
+    <TargetFramework>{{target-framework}}</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      The build has no warnings and keeps none. A rule that is wrong for this
+      codebase is suppressed where it fires, with a comment that says why, never
+      by a global NoWarn list.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Reproducible builds">
+    <Deterministic>true</Deterministic>
+    <!-- Normalizes the paths embedded in PDBs and Source Link, on CI only. -->
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Label="NuGet audit">
+    <!--
+      Transitive audit (the default for net10.0 and later), every severity. With
+      TreatWarningsAsErrors, NU1901 to NU1904 fail the build: a vulnerable
+      dependency blocks a merge until it is updated. An advisory that does not
+      apply is suppressed alone, with a NuGetAuditSuppress item and a comment.
+    -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Version">
+    <!--
+      The version lives in git tags only. Local builds are 0.0.0-dev; the release
+      and preview workflows pass -p:Version=<version>.
+    -->
+    <VersionPrefix>0.0.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Packages">
+    <!-- Nothing ships unless its project sets IsPackable to true. -->
+    <IsPackable>false</IsPackable>
+    <Authors>{{copyright-holder}}</Authors>
+    <Copyright>Copyright (c) {{year}} {{copyright-holder}}</Copyright>
+    <PackageLicenseExpression>{{license-expression}}</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/{{owner}}/{{repo}}</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/{{owner}}/{{repo}}</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- Source Link is built into the SDK; these make the package point at the commit. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!--
+      Package validation: consistency across target frameworks always, and API
+      compatibility against the last release when the pack job passes
+      ReleaseBaselineVersion (never for the v0.0.0 baseline). A package that has
+      never been released sets SkipPackageValidationBaseline to true in its
+      project until its first release.
+    -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion Condition="'$(ReleaseBaselineVersion)' != '' and '$(ReleaseBaselineVersion)' != '0.0.0' and '$(SkipPackageValidationBaseline)' != 'true'">$(ReleaseBaselineVersion)</PackageValidationBaselineVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+</Project>

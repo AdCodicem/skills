@@ -1,0 +1,19 @@
+# Toolchain of a Pulumi program in TypeScript (references/iac/pulumi.md): paste
+# `setup` where ci-jobs.yml and deploy.yml say `# {{pulumi-toolchain-setup}}`, and
+# `test` where ci-jobs.yml says `# {{pulumi-toolchain-test}}`.
+setup:
+  - uses: pnpm/action-setup@v6
+  - uses: actions/setup-node@v7
+    with:
+      node-version-file: .nvmrc
+      package-manager-cache: false
+  - name: Install
+    working-directory: "{{infra-dir}}"
+    run: pnpm install --frozen-lockfile
+test:
+  - name: Type check
+    working-directory: "{{infra-dir}}"
+    run: pnpm exec tsc --noEmit
+  - name: Unit tests (Pulumi mocks)
+    working-directory: "{{infra-dir}}"
+    run: pnpm exec vitest run

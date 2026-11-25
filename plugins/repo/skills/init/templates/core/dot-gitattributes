@@ -1,0 +1,32 @@
+# Normalize line endings: LF in the repository and in working copies.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries are never diffed or normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Generated files: collapsed in diffs, excluded from language statistics.
+CHANGELOG.md linguist-generated
+.github/workflows/actions.lock linguist-generated
+*.lock linguist-generated
+pnpm-lock.yaml linguist-generated
+package-lock.json linguist-generated
+uv.lock linguist-generated
+
+# Ecosystem modules append their lines below.

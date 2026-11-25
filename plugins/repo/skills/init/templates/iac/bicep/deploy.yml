@@ -1,0 +1,140 @@
+# Applies the infrastructure: staging on every push to main, production after the
+# `production` environment's approval (references/iac/bicep.md).
+# {{infra-dir}} is `infra` in an application repository, `.` in an operations repository.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    # In an operations repository, remove `paths`: everything in it is infrastructure.
+    paths:
+      - "{{infra-dir}}/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions: {}
+
+jobs:
+  staging:
+    if: github.event_name == 'push' || inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # AZURE_CLIENT_ID is a variable of the `staging` environment; its federated
+      # credential's subject is repo:{{owner}}/{{repo}}:environment:staging.
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # A deployment stack tracks what it manages: a resource removed from the code
+      # is deleted in staging, and deny settings block deletion outside the stack.
+      - uses: azure/bicep-deploy@v2
+        with:
+          type: deploymentStack
+          operation: create
+          scope: resourceGroup
+          name: "{{project}}-staging"
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: ${{ vars.AZURE_RESOURCE_GROUP }}
+          template-file: "{{infra-dir}}/main.bicep"
+          parameters-file: "{{infra-dir}}/main.staging.bicepparam"
+          action-on-unmanage-resources: delete
+          deny-settings-mode: denyDelete
+
+  # Read-only what-if of production, so the reviewer reads the plan in this job's
+  # summary before approving `production`. Uses the plan identity, whose federated
+  # credential for this job is repo:{{owner}}/{{repo}}:ref:refs/heads/main.
+  production-plan:
+    needs: staging
+    if: >-
+      always() &&
+      (needs.staging.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if against production
+        env:
+          AZURE_CORE_NO_COLOR: "true"
+          RG_PRODUCTION: ${{ vars.AZURE_RESOURCE_GROUP_PRODUCTION }}
+        run: |
+          {
+            echo "### What-if: production"
+            echo '```text'
+            az deployment group what-if \
+              --resource-group "$RG_PRODUCTION" \
+              --template-file "{{infra-dir}}/main.bicep" \
+              --parameters "{{infra-dir}}/main.production.bicepparam" \
+              --validation-level ProviderNoRbac
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # The environment's required reviewer approves this job. Where the plan has no
+  # required reviewers (private repositories below Enterprise Cloud), production
+  # must only run on a deliberate dispatch: replace the `if:` below with
+  #   if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
+  production:
+    needs: production-plan
+    if: always() && needs.production-plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # In production, a resource removed from the code is detached, not deleted:
+      # delete it by hand once the detach is confirmed.
+      - uses: azure/bicep-deploy@v2
+        with:
+          type: deploymentStack
+          operation: create
+          scope: resourceGroup
+          name: "{{project}}-production"
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          resource-group-name: ${{ vars.AZURE_RESOURCE_GROUP }}
+          template-file: "{{infra-dir}}/main.bicep"
+          parameters-file: "{{infra-dir}}/main.production.bicepparam"
+          action-on-unmanage-resources: detach
+          deny-settings-mode: denyDelete

@@ -1,0 +1,145 @@
+name: preview
+
+# Complete tier. Every Monday, and on dispatch, publishes a preview of every
+# package as <next version>-preview.<commits since the last stable tag>, but
+# only when something that ships changed since the last successful preview
+# (preview-gate.sh, which reads the deployments of the `preview` environment).
+# Previews carry no approval, no GitHub release and no changelog entry.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: preview
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: read
+    outputs:
+      last_version: ${{ steps.version.outputs.last_version }}
+      preview_version: ${{ steps.version.outputs.preview_version }}
+      publish: ${{ steps.gate.outputs.publish }}
+    steps:
+      - name: Refuse any branch but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Previews are published from main only."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "26"
+          package-manager-cache: false # no cache where a release is made
+
+      - run: npm ci --ignore-scripts
+
+      - id: version
+        run: node .github/scripts/next-version.mjs >> "$GITHUB_OUTPUT"
+
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/preview-gate.sh
+
+  verify:
+    name: verify
+    needs: plan
+    if: needs.plan.outputs.publish == 'true'
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      id-token: write
+
+  pack:
+    name: pack
+    needs: [plan, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # SemVer form; a module whose registry needs another form maps it in its
+      # own steps (PEP 440 for PyPI: <next>.dev<height>).
+      VERSION: ${{ needs.plan.outputs.preview_version }}
+      LAST_VERSION: ${{ needs.plan.outputs.last_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Paste each module's release-pack.yml steps here, as in release.yml.
+
+      - name: Digests
+        run: |
+          find dist -mindepth 2 -maxdepth 2 -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256
+          cat dist.sha256
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          # One folder per registry; dist.sha256 keeps dist/ at the artifact root.
+          path: |
+            dist.sha256
+            dist/*/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish
+    needs: [plan, pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Deployment branch main, no reviewer: its successful deployments are what
+    # preview-gate.sh compares with.
+    environment: preview
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.plan.outputs.preview_version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+
+      - name: Refuse files changed since pack
+        run: sha256sum --check dist.sha256
+
+      - name: Attest
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*/*
+
+      # Paste each module's release-publish.yml steps here, as in release.yml.
+
+  # Complete tier: refresh the preview version of the documentation site.
+  # docs:
+  #   name: docs
+  #   needs: publish
+  #   uses: ./.github/workflows/docs.yml
+  #   with:
+  #     ref: ${{ github.sha }}
+  #   permissions:
+  #     contents: read
+  #     pages: write
+  #     id-token: write

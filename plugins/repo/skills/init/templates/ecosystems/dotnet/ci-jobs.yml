@@ -1,0 +1,70 @@
+# Fragment: paste these jobs under `jobs:` of ci.yml, above `gate`, and add
+# `dotnet-format` and `dotnet-build` to `gate.needs`.
+jobs:
+  dotnet-format:
+    name: dotnet format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Whitespace only, in folder mode: no restore, no build. The style and
+      # naming rules of .editorconfig are enforced by the build itself
+      # (EnforceCodeStyleInBuild with TreatWarningsAsErrors).
+      - name: Check formatting
+        run: dotnet format whitespace --folder --verify-no-changes
+
+  dotnet-build:
+    name: dotnet build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      # Tokenless Codecov upload; remove with the Codecov step when the profile
+      # has no Codecov.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      # Microsoft.Testing.Platform mode (global.json `test.runner`). Integration
+      # tests use Testcontainers: ubuntu-latest runners have Docker.
+      - name: Test
+        run: >-
+          dotnet test --configuration Release --no-build
+          --results-directory TestResults
+          --coverage --coverage-output-format cobertura
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          directory: TestResults
+          # Pull requests from forks cannot request an OIDC token; Codecov takes
+          # their uploads without one on public repositories.
+          use_oidc: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+          fail_ci_if_error: false
+
+      # Packs without a baseline: catches broken package metadata and
+      # inconsistencies across target frameworks on every pull request. API
+      # compatibility with the last release is checked when release.yml packs.
+      - name: Pack
+        run: dotnet pack --configuration Release --no-build --output artifacts/packages

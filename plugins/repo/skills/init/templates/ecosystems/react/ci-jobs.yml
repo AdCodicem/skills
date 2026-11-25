@@ -1,0 +1,141 @@
+# Fragment: paste these jobs under `jobs:` in ci.yml, above `gate`, and add every job id
+# (react-lint, react-typecheck, react-test, react-build, plus react-e2e at the complete
+# tier) to gate.needs.
+# An application in a subfolder (apps/web): add `defaults: { run: { working-directory:
+# apps/web } }` to each job, and `package_json_file`, `node-version-file` and
+# `cache-dependency-path` to the setup steps.
+#
+# An application runs on one Node.js version, the one .nvmrc pins: no matrix.
+jobs:
+  react-lint:
+    name: react lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Format
+        run: pnpm run format:check
+      - name: Lint
+        run: pnpm run lint
+
+  react-typecheck:
+    name: react typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm run typecheck
+
+  react-test:
+    name: react test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # tokenless Codecov upload; drop with the Codecov step
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm run test:coverage
+      - name: Coverage summary
+        run: |
+          # shellcheck disable=SC2016 # ${...} are JavaScript template literals
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const total = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8")).total;
+            const rows = ["lines", "branches", "functions", "statements"].map((k) => `| ${k} | ${total[k].pct} % |`);
+            console.log(["### Coverage", "", "| Metric | Covered |", "| --- | --- |", ...rows].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
+      # Standard tier, public profiles. OIDC instead of a stored CODECOV_TOKEN.
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage/lcov.info
+          flags: react
+          fail_ci_if_error: false
+
+  react-build:
+    name: react build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # The same build the deployment runs; the deployment builds again from the
+      # released commit, so nothing built for a pull request is ever deployed.
+      - name: Build
+        run: pnpm run build
+
+  # Complete tier. Browsers come from Playwright's own installer, at the version the
+  # lock file pins; no install script runs.
+  react-e2e:
+    name: react e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests
+        run: pnpm run test:e2e
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

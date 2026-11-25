@@ -1,0 +1,19 @@
+# pnpm settings: pnpm 11 and later read them here, and .npmrc holds registry auth only.
+# pnpm 12 fails on an unknown key when packageManager pins it: check names against
+# https://pnpm.io/settings before adding one.
+#
+# Kept at their secure defaults, so not repeated: minimumReleaseAge 1440 (a version
+# must be a day old), strictDepBuilds true (an unreviewed install script fails the
+# install), blockExoticSubdeps true (no git or tarball sources below direct deps).
+
+# Fail when a package loses trust evidence it had (published by a trusted publisher
+# or with provenance before, without it now): the signature of a hijacked release.
+trustPolicy: no-downgrade
+
+# Install scripts allowed to run, reviewed one by one (pnpm approve-builds). Empty:
+# tsdown, Vite and Vitest need none.
+allowBuilds: {}
+
+# A monorepo lists its packages here:
+# packages:
+#   - "packages/*"

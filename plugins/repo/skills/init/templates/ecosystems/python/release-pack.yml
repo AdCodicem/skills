@@ -1,0 +1,21 @@
+# Fragment: steps for the `pack` job of release.yml and preview.yml, which set VERSION.
+# No credentials, no cache (a release never restores a cache a pull request could have written).
+steps:
+  - uses: actions/checkout@v7
+    with:
+      persist-credentials: false
+  - uses: astral-sh/setup-uv@v10.4.0
+    with:
+      enable-cache: false
+  # PyPI only accepts PEP 440 versions, and normalizes the SemVer preview form
+  # `1.2.0-preview.7` to the release candidate `1.2.0rc7`. A preview is a development
+  # release: map it to `1.2.0.dev7`. A stable `1.2.0` is the same in both schemes.
+  - name: Stamp the version
+    run: |
+      version="$VERSION"
+      case "$version" in
+        *-preview.*) version="${version%%-preview.*}.dev${version##*-preview.}" ;;
+      esac
+      uv version "$version" --frozen
+  - name: Build
+    run: uv build --no-sources --out-dir dist/pypi

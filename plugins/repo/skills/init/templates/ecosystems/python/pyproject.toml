@@ -1,0 +1,83 @@
+# Fragment: merge these tables into the pyproject.toml that `uv init` wrote.
+# Keep [project] as generated, then: version = "0.0.0" (the release stamps the real one),
+# requires-python = ">={{python-min}}" for a library (the latest stable for an application),
+# and the description, license and URLs filled in.
+
+[project]
+version = "0.0.0"
+requires-python = ">={{python-min}}"
+# The profile's license as an SPDX expression (PEP 639); delete both keys when there is none.
+license = "MIT"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/{{owner}}/{{repo}}"
+Source = "https://github.com/{{owner}}/{{repo}}"
+Issues = "https://github.com/{{owner}}/{{repo}}/issues"
+Changelog = "https://github.com/{{owner}}/{{repo}}/blob/main/CHANGELOG.md"
+
+# A CLI tool declares its commands here; delete the table for a plain library.
+# [project.scripts]
+# {{project}} = "{{package}}.cli:main"
+
+# PEP 735 groups, locked in uv.lock. `uv sync` installs `dev` by default.
+# Renovate updates them as build(deps): nothing here ships.
+[dependency-groups]
+dev = [
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "twine",
+]
+docs = [
+    "griffe2md",
+]
+
+[tool.ruff]
+line-length = 100
+# target-version is read from requires-python.
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "PTH", # flake8-use-pathlib
+    "C4",  # flake8-comprehensions
+    "PIE", # flake8-pie
+    "PT",  # flake8-pytest-style
+    "RUF", # Ruff-specific rules
+]
+
+[tool.mypy]
+strict = true
+python_version = "{{python-min}}"
+files = ["src", "tests"]
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["{{package}}"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+]
+
+[tool.griffe2md]
+docstring_style = "google"

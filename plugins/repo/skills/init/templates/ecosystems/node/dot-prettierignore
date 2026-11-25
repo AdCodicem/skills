@@ -1,0 +1,10 @@
+# Generated or written by tools that own their format.
+lib/
+coverage/
+.vitest/
+dist/
+pnpm-lock.yaml
+CHANGELOG.md
+docs/website/build/
+docs/website/.docusaurus/
+docs/website/docs/reference/api/

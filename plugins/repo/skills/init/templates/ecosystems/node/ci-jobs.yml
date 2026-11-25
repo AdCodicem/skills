@@ -1,0 +1,120 @@
+# Fragment: paste these jobs under `jobs:` in ci.yml, above `gate`, and add every job id
+# (node-lint, node-typecheck, node-test, node-build) to gate.needs.
+# A package in a subfolder: add `defaults: { run: { working-directory: <folder> } }` to each
+# job, and `package_json_file` / `node-version-file` / `cache-dependency-path` to the setup steps.
+#
+# pnpm comes from the `packageManager` field (pnpm/action-setup reads it; Corepack is not
+# bundled with Node.js 25 and later). It must be installed before setup-node caches it.
+jobs:
+  node-lint:
+    name: node lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Format
+        run: pnpm run format:check
+      - name: Lint
+        run: pnpm run lint
+
+  node-typecheck:
+    name: node typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm run typecheck
+
+  node-test:
+    name: node test (${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # tokenless Codecov upload; drop with the Codecov step
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every maintained LTS line, oldest first, as setup-node aliases: no version to
+        # update when a line starts or ends. engines.node names the oldest one.
+        # An application tests .nvmrc only.
+        node: [lts/-2, lts/-1, lts/*]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Test
+        run: pnpm run test:coverage
+      - name: Coverage summary
+        if: matrix.node == 'lts/*'
+        run: |
+          # shellcheck disable=SC2016 # ${...} are JavaScript template literals
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const total = JSON.parse(readFileSync("coverage/coverage-summary.json", "utf8")).total;
+            const rows = ["lines", "branches", "functions", "statements"].map((k) => `| ${k} | ${total[k].pct} % |`);
+            console.log(["### Coverage", "", "| Metric | Covered |", "| --- | --- |", ...rows].join("\n"));
+          ' >> "$GITHUB_STEP_SUMMARY"
+      # Standard tier, public profiles. OIDC instead of a stored CODECOV_TOKEN.
+      - name: Upload coverage
+        if: matrix.node == 'lts/*'
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage/lcov.info
+          flags: node
+          fail_ci_if_error: false
+
+  node-build:
+    name: node build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm run build
+      # publint: the package.json fields and files a consumer resolves.
+      # attw: the types every resolution mode sees (ESM only, hence the profile).
+      - name: Check the package
+        run: pnpm run check:package

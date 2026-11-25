@@ -25,7 +25,8 @@ Third-party marketplaces do not auto-update by default. Turn it on under
 
 | Plugin | Skills | Surfaces | Description |
 | --- | --- | --- | --- |
-| [dotnet](plugins/dotnet) | `/dotnet:repo-init` | Claude Code, claude.ai | Scaffold or upgrade personal open-source .NET repositories to a standard toolchain |
+| [repo](plugins/repo) | `/repo:init` | Claude Code, claude.ai | Scaffold or audit a GitHub repository in any language: CI, releases, dependency updates, security, documentation, infrastructure |
+| [dotnet](plugins/dotnet) | `/dotnet:csharp`, `/dotnet:runtime-libraries`, `/dotnet:aspnetcore`, `/dotnet:efcore`, `/dotnet:tooling`, `/dotnet:migrate` | Claude Code | Write, review, modernize and upgrade code with C# 14/15 and .NET 10/11 |
 
 Versions and changelogs: see each plugin's `CHANGELOG.md` and the
 [releases](https://github.com/AdCodicem/skills/releases) (tags `<plugin>-v<version>`).
@@ -33,7 +34,7 @@ Versions and changelogs: see each plugin's `CHANGELOG.md` and the
 ## Use on claude.ai or the Claude API
 
 Outside Claude Code, skills are not namespaced, so a skill is named
-`<plugin>-<skill>` (for example `dotnet-repo-init`).
+`<plugin>-<skill>` (for example `repo-init`).
 
 - **claude.ai**: download `<plugin>-<skill>.zip` from the plugin's latest
   release and upload it under Customize > Skills.

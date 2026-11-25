@@ -1,0 +1,58 @@
+name: staging
+
+# Deploys every push to main to the `staging` environment. Production is not
+# deployed from here: release.yml deploys it after a stable release is approved
+# (see references/deploy/github-pages.md, "The deployment model").
+#
+# Not used with GitHub Pages, which serves one site per repository: production
+# only.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# A newer commit of main supersedes an older one still waiting to deploy.
+concurrency:
+  group: staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The merge result was never tested as such (the ruleset does not require
+  # branches to be up to date), so run the full CI on it before deploying.
+  verify:
+    uses: ./.github/workflows/ci.yml
+    # Grant what ci.yml's jobs declare (id-token: write when they upload
+    # coverage to Codecov with OIDC), or those jobs fail to start.
+    permissions:
+      contents: read
+
+  # Container targets only: build the image of this commit once, push it as
+  # sha-<commit>, attest it. Staging and production deploy these same bytes.
+  # For static targets (Static Web Apps, App Service code), delete this job and
+  # remove it from `deploy.needs`.
+  image:
+    needs: verify
+    uses: ./.github/workflows/container.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    with:
+      ref: ${{ github.sha }}
+
+  deploy:
+    needs: [verify, image]
+    uses: ./.github/workflows/deploy.yml
+    # The called workflow cannot be granted more than this; keep only what the
+    # target's deploy.yml declares.
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: staging
+      ref: ${{ github.sha }}
+      version: sha-${{ github.sha }}

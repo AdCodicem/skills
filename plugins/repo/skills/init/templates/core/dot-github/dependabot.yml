@@ -1,0 +1,23 @@
+# Dependabot updates GitHub Actions only, and regenerates the workflow lockfile
+# (.github/workflows/actions.lock) in the same pull request. Every package
+# ecosystem is Renovate's (renovate.json). Dependabot alerts stay on; its
+# security updates are off, because Renovate opens those pull requests.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: weekly
+      day: monday
+    # A release must be public for a week before it is proposed: a compromised
+    # version is usually pulled within that window.
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope

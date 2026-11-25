@@ -1,0 +1,137 @@
+{
+  "branches": [
+    "main"
+  ],
+  "tagFormat": "v${version}",
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [
+          {
+            "breaking": true,
+            "release": "minor"
+          },
+          {
+            "type": "build",
+            "scope": "pack",
+            "release": "patch"
+          },
+          {
+            "type": "docs",
+            "scope": "readme",
+            "release": "patch"
+          }
+        ]
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "types": [
+            {
+              "type": "feat",
+              "section": "Features"
+            },
+            {
+              "type": "fix",
+              "section": "Bug fixes"
+            },
+            {
+              "type": "perf",
+              "section": "Performance"
+            },
+            {
+              "type": "build",
+              "scope": "pack",
+              "section": "Packaging"
+            },
+            {
+              "type": "docs",
+              "section": "Documentation",
+              "hidden": false
+            },
+            {
+              "type": "revert",
+              "section": "Reverts"
+            },
+            {
+              "type": "refactor",
+              "hidden": true
+            },
+            {
+              "type": "build",
+              "hidden": true
+            },
+            {
+              "type": "ci",
+              "hidden": true
+            },
+            {
+              "type": "test",
+              "hidden": true
+            },
+            {
+              "type": "style",
+              "hidden": true
+            },
+            {
+              "type": "chore",
+              "hidden": true
+            }
+          ]
+        }
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "test \"$PACKED_VERSION\" = '${nextRelease.version}' || { echo \"::error::semantic-release computed ${nextRelease.version}, but the pack job packed '$PACKED_VERSION'.\" >&2; exit 1; }"
+      }
+    ],
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md",
+        "changelogTitle": "# Changelog\n\nWritten by [semantic-release](https://github.com/semantic-release/semantic-release) from the\nConventional Commits on `main` when a stable release is cut. Never edit it by hand.\n\n<!-- Releases are prepended below this line. -->"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "CHANGELOG.md"
+        ],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "draftRelease": true,
+        "successCommentCondition": false,
+        "failCommentCondition": false,
+        "assets": [
+          {
+            "path": "dist/nuget/*.nupkg"
+          },
+          {
+            "path": "dist/nuget/*.snupkg"
+          },
+          {
+            "path": "dist/npm/*.tgz"
+          },
+          {
+            "path": "dist/pypi/*"
+          },
+          {
+            "path": "dist/attestations/*.sigstore.json"
+          }
+        ]
+      }
+    ]
+  ]
+}

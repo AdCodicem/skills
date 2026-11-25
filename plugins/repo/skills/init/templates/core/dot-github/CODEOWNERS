@@ -1,0 +1,19 @@
+# Code owners review the paths they own; the ruleset on main requires their
+# approval only for team profiles. Later lines win.
+* @{{codeowner}}
+
+# Workflows and their lockfile always need a code owner.
+/.github/ @{{codeowner}}
+/.github/workflows/actions.lock @{{codeowner}}
+
+# Team profiles only: dependency manifests and lock files have no owner, so the
+# approval the dependency workflow gives to non-major bot updates is enough.
+# Keep the lines of the ecosystems present; delete this block for solo profiles.
+# /package.json
+# /pnpm-lock.yaml
+# /package-lock.json
+# /Directory.Packages.props
+# /global.json
+# /.config/dotnet-tools.json
+# /pyproject.toml
+# /uv.lock

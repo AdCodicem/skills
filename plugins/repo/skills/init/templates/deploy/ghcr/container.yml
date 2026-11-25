@@ -1,0 +1,121 @@
+name: container
+
+# Builds the container image of one commit, once, and pushes it to GHCR as
+# ghcr.io/{{owner}}/{{repo}}:sha-<commit>. staging.yml and release.yml call it;
+# both deploy these same bytes, and the release only adds version tags to the
+# digest (release-publish.yml). The build runs with no credential; the push job
+# builds nothing. Copy to .github/workflows/container.yml.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Full commit SHA to build.
+        type: string
+        required: true
+    outputs:
+      digest:
+        description: Digest of the pushed image.
+        value: ${{ jobs.check.outputs.digest || jobs.push.outputs.digest }}
+
+permissions: {}
+
+jobs:
+  # An image already pushed for this commit is reused, never rebuilt.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      packages: read
+    outputs:
+      digest: ${{ steps.inspect.outputs.digest }}
+    steps:
+      - id: inspect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}:sha-$REF"
+          skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<<"$GH_TOKEN"
+          if raw=$(skopeo inspect --raw "docker://$image" 2>/dev/null); then
+            echo "digest=sha256:$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+            echo "Reusing $image."
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.digest == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Labels link the package to the repository (org.opencontainers.image.source).
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: type=sha,format=long
+
+      # An OCI archive, with the SLSA provenance and the SBOM BuildKit attaches.
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          outputs: type=oci,dest=image.tar
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: image.tar
+          if-no-files-found: error
+          retention-days: 1
+
+  push:
+    needs: [check, build]
+    if: needs.check.outputs.digest == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      packages: write
+      attestations: write
+      id-token: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - id: push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          image="ghcr.io/${REPOSITORY,,}"
+          skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<<"$GH_TOKEN"
+          skopeo copy --all --preserve-digests oci-archive:image.tar "docker://$image:sha-$REF"
+          raw=$(skopeo inspect --raw "docker://$image:sha-$REF")
+          echo "digest=sha256:$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+
+      # Attestations need a public repository or Enterprise Cloud.
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ steps.push.outputs.name }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
