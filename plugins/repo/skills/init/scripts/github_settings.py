@@ -8,14 +8,17 @@ Settings:
 
 - merge options: squash only, the pull request title and body as the commit,
   auto-merge allowed, branches deleted after merge, update branch allowed;
-- the `main` ruleset on the default branch: no deletion, no force push, linear
-  history, pull requests (squash only, threads resolved, approvals per
-  profile), required checks (not strict), the release App on the bypass list;
-- workflow token read-only by default (and allowed to approve pull requests for
-  team profiles); actions must be pinned to a full SHA;
+- two layered rulesets on the default branch: `main`, for everyone (no
+  deletion, no force push, linear history, squash-only pull requests with
+  threads resolved, required checks not strict; the release App may bypass),
+  and `main-human-gates`, which the bots' App (Renovate's) and the release App
+  are exempt from (branches up to date, the `CodeQL` check, and a code owner's
+  approval for team profiles);
+- workflow token read-only by default; actions must be pinned to a full SHA;
 - Dependabot alerts on, Dependabot security updates off (Renovate opens them);
 - secret scanning and push protection, private vulnerability reporting,
-  immutable releases, CodeQL default setup, Discussions, where allowed;
+  immutable releases, Discussions, where allowed; CodeQL default setup off,
+  because the `codeql.yml` workflow runs advanced setup;
 - environments (`release`, `preview`, `staging`, `production`) limited to the
   default branch, with required reviewers where the plan has them.
 
@@ -25,8 +28,8 @@ repository.
 Usage:
     python3 scripts/github_settings.py --repo OWNER/NAME --profile PROFILE
         [--tier minimal|standard|complete] [--environment NAME ...]
-        [--reviewer LOGIN] [--release-app-id ID] [--check NAME ...]
-        [--code-security] [--apply] [--json]
+        [--reviewer LOGIN] [--release-app-id ID] [--bots-app-id ID]
+        [--check NAME ...] [--code-security] [--apply] [--json]
 
 Exit codes: 0 nothing to change or everything applied, 1 changes pending (plan
 only) or some changes failed, 2 the repository cannot be read.
@@ -46,6 +49,7 @@ PROFILES = ("personal-oss", "personal-private", "company-private", "company-oss"
 TIERS = ("minimal", "standard", "complete")
 DEFAULT_CHECKS = ("gate", "pr-title", "workflows", "pre-commit")
 RULESET_NAME = "main"
+HUMAN_GATES_NAME = "main-human-gates"
 TIMEOUT = 60
 
 Runner = Callable[[list[str], str | None], tuple[int, str, str]]
@@ -141,19 +145,41 @@ def _skip(area: str, setting: str, reason: str, desired: object = None) -> Chang
     return Change(area, setting, None, desired, "skip", reason)
 
 
-def ruleset_body(profile: str, checks: list[str], release_app_id: int | None) -> dict:
-    team = profile.startswith("company")
-    bypass = []
+def _bypass(release_app_id: int | None, bots_app_id: int | None, mode: str) -> list[dict]:
+    actors = []
     if release_app_id:
-        bypass.append(
-            {"actor_id": release_app_id, "actor_type": "Integration", "bypass_mode": "always"}
+        actors.append(
+            {"actor_id": release_app_id, "actor_type": "Integration", "bypass_mode": mode}
         )
+    if bots_app_id and mode == "exempt":
+        actors.append({"actor_id": bots_app_id, "actor_type": "Integration", "bypass_mode": mode})
+    return actors
+
+
+def _checks_rule(checks: list[str], strict: bool) -> dict:
+    return {
+        "type": "required_status_checks",
+        "parameters": {
+            "strict_required_status_checks_policy": strict,
+            "do_not_enforce_on_create": False,
+            "required_status_checks": [{"context": c} for c in checks],
+        },
+    }
+
+
+def _target() -> dict:
+    return {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}}
+
+
+def ruleset_body(checks: list[str], release_app_id: int | None) -> dict:
+    """`main`, for everyone: what bots and people alike must respect."""
     return {
         "name": RULESET_NAME,
         "target": "branch",
         "enforcement": "active",
-        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
-        "bypass_actors": bypass,
+        "conditions": _target(),
+        # The release App pushes the changelog commit and the tag.
+        "bypass_actors": _bypass(release_app_id, None, "always"),
         "rules": [
             {"type": "deletion"},
             {"type": "non_fast_forward"},
@@ -161,23 +187,56 @@ def ruleset_body(profile: str, checks: list[str], release_app_id: int | None) ->
             {
                 "type": "pull_request",
                 "parameters": {
-                    "required_approving_review_count": 1 if team else 0,
+                    "required_approving_review_count": 0,
                     "dismiss_stale_reviews_on_push": True,
-                    "require_code_owner_review": team,
+                    "require_code_owner_review": False,
                     "require_last_push_approval": False,
                     "required_review_thread_resolution": True,
                     "allowed_merge_methods": ["squash"],
                 },
             },
-            {
-                "type": "required_status_checks",
-                "parameters": {
-                    "strict_required_status_checks_policy": False,
-                    "do_not_enforce_on_create": False,
-                    "required_status_checks": [{"context": c} for c in checks],
-                },
-            },
+            _checks_rule(checks, strict=False),
         ],
+    }
+
+
+def human_gates_body(
+    profile: str,
+    checks: list[str],
+    code_scanning: bool,
+    release_app_id: int | None,
+    bots_app_id: int | None,
+) -> dict:
+    """`main-human-gates`: the bars people meet and the bots' App is exempt from.
+
+    Branches up to date (Dependabot never rebases a branch that is only behind;
+    Renovate need not when it is exempt), the code scanning check, and, for
+    teams, a code owner's approval (a bot cannot approve, and no workflow has
+    to approve for it).
+    """
+    team = profile.startswith("company")
+    rules = [_checks_rule(checks + (["CodeQL"] if code_scanning else []), strict=True)]
+    if team:
+        rules.append(
+            {
+                "type": "pull_request",
+                "parameters": {
+                    "required_approving_review_count": 1,
+                    "dismiss_stale_reviews_on_push": True,
+                    "require_code_owner_review": True,
+                    "require_last_push_approval": False,
+                    "required_review_thread_resolution": True,
+                    "allowed_merge_methods": ["squash"],
+                },
+            }
+        )
+    return {
+        "name": HUMAN_GATES_NAME,
+        "target": "branch",
+        "enforcement": "active",
+        "conditions": _target(),
+        "bypass_actors": _bypass(release_app_id, bots_app_id, "exempt"),
+        "rules": rules,
     }
 
 
@@ -196,8 +255,39 @@ def _ruleset_summary(ruleset: dict | None) -> dict | None:
         "merge_methods": pull_request.get("allowed_merge_methods"),
         "strict": checks.get("strict_required_status_checks_policy"),
         "checks": sorted(c["context"] for c in checks.get("required_status_checks", [])),
-        "bypass": sorted(a.get("actor_id") for a in ruleset.get("bypass_actors", []) or []),
+        "bypass": sorted(
+            f"{a.get('actor_id')}:{a.get('bypass_mode')}"
+            for a in ruleset.get("bypass_actors") or []
+        ),
     }
+
+
+def _ruleset_change(endpoint: str, body: dict, existing: dict | None) -> Change:
+    """Create or update one ruleset; keep bypass actors set by hand when none are given."""
+    current = _ruleset_summary(existing)
+    if existing and not body["bypass_actors"]:
+        body["bypass_actors"] = existing.get("bypass_actors") or []
+    desired = _ruleset_summary(body)
+    if existing:
+        return _compare(
+            "ruleset",
+            body["name"],
+            current,
+            desired,
+            method="PUT",
+            endpoint=f"{endpoint}/rulesets/{existing['id']}",
+            body=body,
+        )
+    return Change(
+        "ruleset",
+        body["name"],
+        None,
+        desired,
+        "change",
+        method="POST",
+        endpoint=f"{endpoint}/rulesets",
+        body=body,
+    )
 
 
 def plan(
@@ -210,6 +300,7 @@ def plan(
     release_app_id: int | None = None,
     checks: list[str] | None = None,
     code_security: bool = False,
+    bots_app_id: int | None = None,
 ) -> tuple[dict, list[Change]]:
     response = gh.get(f"repos/{repo}")
     if response.status != 200 or not isinstance(response.data, dict):
@@ -234,7 +325,6 @@ def plan(
         "admin": (info.get("permissions") or {}).get("admin"),
         "capabilities": can,
     }
-    team = profile.startswith("company")
     oss = profile.endswith("oss")
     changes: list[Change] = []
     endpoint = f"repos/{repo}"
@@ -275,58 +365,36 @@ def plan(
             )
         )
 
-    # Ruleset on the default branch.
+    # Rulesets on the default branch.
     if can["rulesets"]:
-        body = ruleset_body(profile, checks or list(DEFAULT_CHECKS), release_app_id)
         listed = gh.get(f"{endpoint}/rulesets")
-        existing = None
+        existing_by_name: dict[str, dict] = {}
         if listed.status == 200 and isinstance(listed.data, list):
-            match = next((r for r in listed.data if r.get("name") == RULESET_NAME), None)
-            if match:
-                detail = gh.get(f"{endpoint}/rulesets/{match['id']}")
-                existing = detail.data if isinstance(detail.data, dict) else None
-        current = _ruleset_summary(existing)
-        desired = _ruleset_summary(body)
-        if existing and not release_app_id:
-            # Keep a bypass actor configured by hand when no App id was given.
-            body["bypass_actors"] = existing.get("bypass_actors") or []
-            desired["bypass"] = current["bypass"] if current else []  # type: ignore[index]
-        if existing:
-            changes.append(
-                _compare(
-                    "ruleset",
-                    RULESET_NAME,
-                    current,
-                    desired,
-                    method="PUT",
-                    endpoint=f"{endpoint}/rulesets/{existing['id']}",
-                    body=body,
-                )
-            )
-        else:
-            changes.append(
-                Change(
-                    "ruleset",
-                    RULESET_NAME,
-                    None,
-                    desired,
-                    "change",
-                    method="POST",
-                    endpoint=f"{endpoint}/rulesets",
-                    body=body,
-                )
-            )
-        if not release_app_id and not (current and current["bypass"]):
-            changes[
-                -1
-            ].reason = (
-                "no release App on the bypass list: pass --release-app-id once the App exists"
+            for item in listed.data:
+                if item.get("name") in {RULESET_NAME, HUMAN_GATES_NAME}:
+                    detail = gh.get(f"{endpoint}/rulesets/{item['id']}")
+                    if isinstance(detail.data, dict):
+                        existing_by_name[item["name"]] = detail.data
+        required = checks or list(DEFAULT_CHECKS)
+        code_scanning = tier != "minimal" and can["codeql"]
+        bodies = [
+            ruleset_body(required, release_app_id),
+            human_gates_body(profile, required, code_scanning, release_app_id, bots_app_id),
+        ]
+        for body in bodies:
+            changes.append(_ruleset_change(endpoint, body, existing_by_name.get(body["name"])))
+        if not release_app_id:
+            changes[-2].reason = "no release App on the bypass list: pass --release-app-id"
+        if not bots_app_id:
+            changes[-1].reason = (
+                "the bots' App is not exempt: pass --bots-app-id (the Renovate App), or its "
+                "pull requests wait for an up-to-date branch and a person's review"
             )
     else:
         changes.append(
             _skip(
                 "ruleset",
-                RULESET_NAME,
+                f"{RULESET_NAME}, {HUMAN_GATES_NAME}",
                 "rulesets on private repositories need Pro, Team or Enterprise",
             )
         )
@@ -336,7 +404,9 @@ def plan(
     if workflow.status == 200 and isinstance(workflow.data, dict):
         desired_workflow = {
             "default_workflow_permissions": "read",
-            "can_approve_pull_request_reviews": team,
+            # No workflow approves pull requests: bots are exempt from the
+            # approval of main-human-gates instead.
+            "can_approve_pull_request_reviews": False,
         }
         current_workflow = {k: workflow.data.get(k) for k in desired_workflow}
         changes.append(
@@ -455,27 +525,29 @@ def plan(
             )
         )
     if tier == "minimal":
-        changes.append(_skip("security", "CodeQL default setup", "standard tier and up"))
+        changes.append(_skip("security", "CodeQL", "standard tier and up"))
     elif can["codeql"]:
+        # codeql.yml runs advanced setup, whose `CodeQL` check main-human-gates
+        # requires; default setup would refuse its uploads, so it stays off.
         codeql = gh.get(f"{endpoint}/code-scanning/default-setup")
         state = codeql.data.get("state") if isinstance(codeql.data, dict) else None
         changes.append(
             _compare(
                 "security",
-                "CodeQL default setup",
+                "CodeQL default setup (off: codeql.yml runs advanced setup)",
                 state,
-                "configured",
+                "not-configured",
                 method="PATCH",
                 endpoint=f"{endpoint}/code-scanning/default-setup",
-                body={"state": "configured", "query_suite": "default"},
+                body={"state": "not-configured"},
             )
         )
     else:
         changes.append(
             _skip(
                 "security",
-                "CodeQL default setup",
-                "needs a public repository or GitHub Code Security",
+                "CodeQL",
+                "needs a public repository or GitHub Code Security: Semgrep runs in ci.yml",
             )
         )
 
@@ -624,6 +696,11 @@ def main(argv: list[str] | None = None, gh: GitHub | None = None) -> int:
         "--release-app-id", type=int, help="the release GitHub App's ID, for the bypass list"
     )
     parser.add_argument(
+        "--bots-app-id",
+        type=int,
+        help="the Renovate App's ID, exempt from main-human-gates",
+    )
+    parser.add_argument(
         "--check", action="append", help="required check (default: the four of the standard)"
     )
     parser.add_argument(
@@ -645,6 +722,7 @@ def main(argv: list[str] | None = None, gh: GitHub | None = None) -> int:
             args.release_app_id,
             args.check,
             args.code_security,
+            args.bots_app_id,
         )
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)

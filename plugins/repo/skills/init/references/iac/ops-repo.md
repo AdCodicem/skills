@@ -28,7 +28,7 @@ Run the whole skill on the new repository, as its own project:
 2. The core applies as for any repository: ruleset on `main` (the plan must
    allow rulesets on private repositories: Pro, Team or above, see
    [github-plans](../github-plans.md)), `ci.yml` with `gate`, `lint.yml`,
-   Renovate, Dependabot for actions, `CLAUDE.md`. There is no release
+   Renovate (actions included), `CLAUDE.md`. There is no release
    workflow: what ships from here is a deployment, not a package.
 3. The tool's files at the root, `ci-jobs.yml` merged into `ci.yml`, and
    `deploy.yml` without its `paths` filter.

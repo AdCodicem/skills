@@ -57,8 +57,9 @@ Applied to every workflow the skill writes, and checked in audit mode:
   GitHub's documentation now recommends it over SHA pinning alone). The skill
   keeps both: SHA pins stay readable by Scorecard and by people, the lockfile
   covers what pins cannot. Generate it with the `gh actions-lock` extension
-  (see "Lockfile" below). Dependabot updates the pin and the lockfile in the
-  same pull request.
+  (see "Lockfile" below). Renovate updates the pin and regenerates the
+  lockfile in the same pull request (experimental); `gh actions-lock --verify`
+  refuses a stale one.
 - **No `pull_request_target`**: GitHub blocks it by default in public
   repositories from 2026-12-02, and it is the root of most workflow takeovers.
   Bot pull requests are handled on `pull_request` with explicit permissions.
@@ -81,8 +82,10 @@ every build:
 | `workflows` | `actionlint`, `zizmor` (configured by `.github/zizmor.yml`) and `gh actions-lock --verify` over `.github/workflows` |
 | `pre-commit` | Every hook of `.pre-commit-config.yaml` over every file |
 
-The ruleset requires `gate`, `pr-title`, `workflows` and `pre-commit`. These
-four names are the contract: renaming a job means updating the ruleset.
+The `main` ruleset requires `gate`, `pr-title`, `workflows` and `pre-commit`
+(not strict); `main-human-gates` requires the same four, strict, plus
+`CodeQL` where `codeql.yml` runs ([branching-and-commits](branching-and-commits.md)).
+These names are the contract: renaming a job means updating both rulesets.
 
 `templates/core/dot-github/zizmor.yml` disables one audit, `self-repository`:
 zizmor recommends GitHub's `$/` syntax for same-repository workflows and

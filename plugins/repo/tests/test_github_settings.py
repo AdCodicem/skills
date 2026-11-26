@@ -83,7 +83,7 @@ def responses(visibility="public", owner_type="User", plan="free", overrides=Non
         ),
         ("GET", f"repos/{REPO}/private-vulnerability-reporting"): (200, {"enabled": False}),
         ("GET", f"repos/{REPO}/immutable-releases"): (200, {"enabled": False}),
-        ("GET", f"repos/{REPO}/code-scanning/default-setup"): (200, {"state": "not-configured"}),
+        ("GET", f"repos/{REPO}/code-scanning/default-setup"): (200, {"state": "configured"}),
         ("GET", "users/me"): (200, {"id": 42, "login": "me"}),
     }
     base.update(overrides or {})
@@ -94,39 +94,66 @@ def changes_by_setting(changes):
     return {c.setting: c for c in changes}
 
 
+CODEQL_DEFAULT = "CodeQL default setup (off: codeql.yml runs advanced setup)"
+
+
+def rules_of(change):
+    return {r["type"]: r.get("parameters") for r in change.body["rules"]}
+
+
+def contexts(rule):
+    return [c["context"] for c in rule["required_status_checks"]]
+
+
 def test_public_personal_repository_gets_the_full_standard():
     fake = FakeGh(responses())
     context, changes = gs.plan(
-        gs.GitHub(fake), REPO, "personal-oss", environments=["release"], reviewer="me",
+        gs.GitHub(fake),
+        REPO,
+        "personal-oss",
+        environments=["release"],
+        reviewer="me",
         release_app_id=7,
-    )  # fmt: skip
+        bots_app_id=8,
+    )
     assert context["plan"] == "free" and context["visibility"] == "public"
     settings = changes_by_setting(changes)
     assert settings["allow_squash_merge"].action == "ok"
     assert settings["allow_merge_commit"].action == "change"
     assert settings["has_discussions"].action == "change"
-    ruleset = settings["main"]
-    assert ruleset.method == "POST"
-    rules = {r["type"]: r.get("parameters") for r in ruleset.body["rules"]}
+
+    main = settings["main"]
+    assert main.method == "POST"
+    rules = rules_of(main)
+    assert {"deletion", "non_fast_forward", "required_linear_history"} <= set(rules)
     assert rules["pull_request"]["required_approving_review_count"] == 0
     assert rules["pull_request"]["allowed_merge_methods"] == ["squash"]
-    assert rules["required_status_checks"]["strict_required_status_checks_policy"] is False
-    assert [c["context"] for c in rules["required_status_checks"]["required_status_checks"]] == [
-        "gate",
-        "pr-title",
-        "workflows",
-        "pre-commit",
-    ]
-    assert ruleset.body["bypass_actors"] == [
+    checks = rules["required_status_checks"]
+    assert checks["strict_required_status_checks_policy"] is False
+    assert contexts(checks) == ["gate", "pr-title", "workflows", "pre-commit"]
+    assert main.body["bypass_actors"] == [
         {"actor_id": 7, "actor_type": "Integration", "bypass_mode": "always"}
     ]
+
+    gates = settings["main-human-gates"]
+    gate_rules = rules_of(gates)
+    assert gate_rules["required_status_checks"]["strict_required_status_checks_policy"] is True
+    assert contexts(gate_rules["required_status_checks"])[-1] == "CodeQL"
+    assert "pull_request" not in gate_rules  # solo: no approval
+    assert gates.body["bypass_actors"] == [
+        {"actor_id": 7, "actor_type": "Integration", "bypass_mode": "exempt"},
+        {"actor_id": 8, "actor_type": "Integration", "bypass_mode": "exempt"},
+    ]
+    assert gates.reason == ""
+
     assert settings["Dependabot alerts"].action == "ok"
     assert settings["Dependabot security updates"].method == "DELETE"
     assert settings["secret_scanning"].action == "ok"
     assert settings["secret_scanning_push_protection"].action == "change"
     assert settings["private vulnerability reporting"].action == "change"
-    assert settings["CodeQL default setup"].action == "change"
+    assert settings[CODEQL_DEFAULT].desired == "not-configured"
     assert settings["sha_pinning_required"].action == "change"
+    assert settings["workflow token"].desired["can_approve_pull_request_reviews"] is False
     assert settings["release"].body["reviewers"] == [{"type": "User", "id": 42}]
     assert fake.writes() == []  # planning never writes
 
@@ -135,33 +162,42 @@ def test_private_free_repository_skips_what_the_plan_forbids():
     fake = FakeGh(responses(visibility="private"))
     _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-private", environments=["release"])
     settings = changes_by_setting(changes)
-    for name in ("main", "release", "secret_scanning", "private vulnerability reporting",
-                 "CodeQL default setup"):  # fmt: skip
+    for name in (
+        "main, main-human-gates",
+        "release",
+        "secret_scanning",
+        "private vulnerability reporting",
+        "CodeQL",
+    ):
         assert settings[name].action == "skip", name
-    assert "Pro" in settings["main"].reason
+    assert "Pro" in settings["main, main-human-gates"].reason
+    assert "Semgrep" in settings["CodeQL"].reason
     assert "has_discussions" not in settings
 
 
-def test_private_pro_repository_has_environments_without_reviewers():
+def test_private_pro_repository_has_environments_without_reviewers_and_no_codeql_check():
     fake = FakeGh(responses(visibility="private", plan="pro"))
     _, changes = gs.plan(
         gs.GitHub(fake), REPO, "personal-private", environments=["production"], reviewer="me"
     )
     settings = changes_by_setting(changes)
     assert settings["main"].action == "change"
+    gate_checks = rules_of(settings["main-human-gates"])["required_status_checks"]
+    assert "CodeQL" not in contexts(gate_checks)  # Semgrep runs inside gate instead
     assert "reviewers" not in settings["production"].body
     assert "dispatch" in settings["production"].reason
 
 
-def test_company_profile_requires_an_approval_and_lets_actions_approve():
+def test_company_profile_requires_a_code_owner_approval_bots_are_exempt_from():
     fake = FakeGh(responses(owner_type="Organization", plan="team"))
     _, changes = gs.plan(gs.GitHub(fake), REPO, "company-oss")
     settings = changes_by_setting(changes)
-    rules = {r["type"]: r.get("parameters") for r in settings["main"].body["rules"]}
-    assert rules["pull_request"]["required_approving_review_count"] == 1
-    assert rules["pull_request"]["require_code_owner_review"] is True
-    assert settings["workflow token"].desired["can_approve_pull_request_reviews"] is True
+    assert rules_of(settings["main"])["pull_request"]["required_approving_review_count"] == 0
+    approval = rules_of(settings["main-human-gates"])["pull_request"]
+    assert approval["required_approving_review_count"] == 1
+    assert approval["require_code_owner_review"] is True
     assert "release App" in settings["main"].reason
+    assert "--bots-app-id" in settings["main-human-gates"].reason
 
 
 def test_existing_ruleset_is_updated_and_its_bypass_kept():
@@ -184,10 +220,11 @@ def test_existing_ruleset_is_updated_and_its_bypass_kept():
         )
     )
     _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-oss")
-    ruleset = changes_by_setting(changes)["main"]
+    settings = changes_by_setting(changes)
+    ruleset = settings["main"]
     assert ruleset.method == "PUT" and ruleset.endpoint == f"repos/{REPO}/rulesets/9"
     assert ruleset.body["bypass_actors"] == existing["bypass_actors"]
-    assert ruleset.reason == ""
+    assert settings["main-human-gates"].method == "POST"
 
 
 def test_apply_makes_only_the_changes_and_reports_failures():
@@ -205,8 +242,9 @@ def test_apply_makes_only_the_changes_and_reports_failures():
     written = {(m, e) for m, e, _ in fake.writes()}
     assert ("DELETE", f"repos/{REPO}/automated-security-fixes") in written
     assert ("PATCH", f"repos/{REPO}") in written
+    assert ("POST", f"repos/{REPO}/rulesets") in written
     assert ("PUT", f"repos/{REPO}/vulnerability-alerts") not in written  # already enabled
-    failed = changes_by_setting(changes)["CodeQL default setup"]
+    failed = changes_by_setting(changes)[CODEQL_DEFAULT]
     assert failed.result.startswith("failed (HTTP 403)")
 
 
@@ -214,15 +252,18 @@ def test_minimal_tier_and_unreadable_immutable_releases():
     fake = FakeGh(responses(overrides={("GET", f"repos/{REPO}/immutable-releases"): (404, None)}))
     _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-oss", tier="minimal")
     settings = changes_by_setting(changes)
-    assert settings["CodeQL default setup"].action == "skip"
+    assert settings["CodeQL"].action == "skip"
+    assert "CodeQL" not in contexts(
+        rules_of(settings["main-human-gates"])["required_status_checks"]
+    )
     assert settings["immutable releases"].action == "skip"
     assert "has_discussions" not in settings
 
 
 def test_main_exit_codes(capsys):
-    plan_only = ["--repo", REPO, "--profile", "personal-oss"]
+    plan_only = ["--repo", REPO, "--profile", "personal-oss", "--bots-app-id", "8"]
     assert gs.main(plan_only, gh=gs.GitHub(FakeGh(responses()))) == 1
-    assert "change" in capsys.readouterr().out
+    assert "main-human-gates" in capsys.readouterr().out
     unreadable = gs.GitHub(FakeGh({}))
     assert gs.main(plan_only, gh=unreadable) == 2
     fake = FakeGh(responses())

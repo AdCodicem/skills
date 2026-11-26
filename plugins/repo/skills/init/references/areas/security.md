@@ -18,10 +18,40 @@ passing criteria and [SLSA](https://slsa.dev/spec/v1.2/) build level 2
 | Private vulnerability reporting | public | A private channel for reports, linked from SECURITY.md |
 | Secret scanning and push protection | public, or private with Secret Protection | Refuses a push that contains a known secret format |
 | Dependabot alerts | all | Known vulnerabilities in dependencies, and Renovate's input |
-| CodeQL default setup | standard tier: public, or private with Code Security | Static analysis on every pull request and weekly; GitHub recommends starting with the default setup |
+| CodeQL default setup **off** | standard tier, where CodeQL runs | `codeql.yml` runs advanced setup, which default setup would refuse |
 | Immutable releases | all where available | A published release's tag and files cannot change |
 | Workflow token read-only by default | all | Least privilege for every workflow that forgets to declare permissions |
 | Actions pinned to a full SHA (policy) | all | A moved tag cannot change what runs |
+
+## Static analysis (standard tier and up)
+
+The bar is enforced on people's pull requests and never blocks the bots'
+dependency updates ([branching-and-commits](branching-and-commits.md)).
+
+| Where | Tool | Enforced by |
+| --- | --- | --- |
+| Public repositories, or private with GitHub Code Security | **CodeQL, advanced setup**: `templates/core/dot-github/workflows/codeql.yml` on pull requests, pushes to `main` and weekly, no `paths` filter, the `actions` language plus the languages of the modules present (`csharp`, `javascript-typescript`, `python`, all with build mode `none`) | the code scanning check `CodeQL`, required by `main-human-gates`: it fails on new alerts at or above the repository's threshold (default: errors, and critical or high security alerts), compared with `main`, and honors dismissed alerts; a `neutral` result passes |
+| Private repositories without Code Security | **Semgrep Community Edition**: `templates/core/ci-jobs-semgrep.yml`, a job of `ci.yml` behind `gate`, with registry rules referenced at run time (`--config p/default`, never copied: their license allows running them, not redistributing them), failing on ERROR and WARNING findings that the pull request adds (`--baseline-commit`; with ERROR alone almost no rule runs) | `gate`; needs no secret, so it runs on bot pull requests too |
+| Every repository | The ecosystems' own analyzers, warnings as errors: .NET security rules (`AnalysisModeSecurity`), ruff `S` rules, typescript-eslint, `bicep lint`, PSRule or Checkov for infrastructure, zizmor for workflows | `gate` and `lint.yml` |
+
+Why not the ruleset rule "Require code scanning results": it blocks while an
+analysis runs and whenever results are missing for the head commit
+([rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#require-code-scanning-results)),
+and it blocked Dependabot pull requests in practice, despite the documented
+exception for them. A required status check counts `success`, `neutral` and
+`skipped` as passing
+([required checks](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
+
+Why not CodeQL on private code without Code Security: the CodeQL CLI's terms
+allow automated analysis of open source code only
+([license](https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md)),
+and code scanning (SARIF upload included) needs Code Security there.
+
+Rejected as defaults: SonarQube Cloud (free on private code only up to 50,000
+lines and 5 members, and it needs a token, a Dependabot-style secret problem),
+Snyk Code (100 tests a month free), GitHub Code Quality (paid on private
+repositories, and its ruleset rule blocks like the code scanning one), Security
+Code Scan (unmaintained since 2022).
 
 ## Files
 

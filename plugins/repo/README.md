@@ -5,12 +5,15 @@ core every repository gets, plus modules chosen from what the repository
 contains and from the user's answers. The same skill scaffolds an empty folder
 and audits an existing repository; it always proposes a plan before writing.
 
-- **Fixed core**: ruleset on `main`, squash merges with Conventional Commit
-  titles, CI behind a single `gate` check, actions pinned by SHA and locked,
-  actionlint and zizmor, semantic-release with approved, drafted, attested and
-  immutable stable releases, trusted publishing, Renovate and Dependabot with
-  unattended merges of non-major updates, security policy and settings,
-  `CLAUDE.md`.
+- **Fixed core**: two layered rulesets (`main` for everyone;
+  `main-human-gates`, with up-to-date branches, the `CodeQL` check and team
+  approvals, that the bots' App is exempt from), squash merges with
+  Conventional Commit titles, CI behind a single `gate` check, actions pinned
+  by SHA and locked, actionlint and zizmor, semantic-release with approved,
+  drafted, attested and immutable stable releases, trusted publishing,
+  self-hosted Renovate merging non-major updates itself (Dependabot keeps the
+  alerts), CodeQL advanced setup or Semgrep on private code, security policy
+  and settings, `CLAUDE.md`.
 - **Modules**: .NET, Node/TypeScript libraries, React applications, Python;
   Bicep or Pulumi infrastructure (always offered with a recommendation),
   Cloudflare through Wrangler; deployments to GitHub Pages, GHCR, Azure or an

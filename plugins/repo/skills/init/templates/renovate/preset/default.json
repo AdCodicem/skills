@@ -1,22 +1,20 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Shared Renovate preset of {{owner}}: see the repo-init skill, references/renovate.md.",
+  "description": "Shared Renovate preset of {{owner}}: Renovate updates every ecosystem, GitHub Actions included, and merges non-major updates itself as its App, which is exempt from the main-human-gates ruleset (see the repo-init skill, references/renovate.md).",
   "extends": [
     "config:recommended",
     ":semanticCommits",
     ":enablePreCommit",
+    "helpers:pinGitHubActionDigestsToSemver",
     "customManagers:githubActionsVersions"
   ],
   "timezone": "{{timezone}}",
-  "github-actions": {
-    "enabled": false
-  },
   "minimumReleaseAge": "3 days",
   "internalChecksFilter": "strict",
-  "rebaseWhen": "behind-base-branch",
-  "platformAutomerge": true,
   "automergeType": "pr",
+  "platformAutomerge": false,
   "automergeStrategy": "squash",
+  "rebaseWhen": "conflicted",
   "prHourlyLimit": 0,
   "prConcurrentLimit": 10,
   "labels": [
@@ -49,10 +47,7 @@
         "pinDigest",
         "lockFileMaintenance"
       ],
-      "automerge": true,
-      "addLabels": [
-        "automerge"
-      ]
+      "automerge": true
     },
     {
       "description": "Majors wait for a person, who reads the release notes.",

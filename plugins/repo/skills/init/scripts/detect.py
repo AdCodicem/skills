@@ -73,6 +73,7 @@ STANDARD_FILES: dict[str, list[str | tuple[str, ...]]] = {
         (".github/dependabot.yml", ".github/dependabot.yaml"),
         ("renovate.json", "renovate.json5", ".github/renovate.json", ".renovaterc"),
     ],
+    "security": [".github/workflows/codeql.yml", ".github/zizmor.yml"],
     "docs": ["docs/adr", "ARCHITECTURE.md", "docs/website"],
     "agents": ["CLAUDE.md", "AGENTS.md"],
 }

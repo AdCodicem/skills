@@ -1,34 +1,40 @@
 # Dependencies
 
-Two bots, each where it is strongest:
+**Renovate**, self-hosted with the account's own GitHub App, updates every
+ecosystem, GitHub Actions included, and merges non-major updates itself.
+**Dependabot keeps the alerts only** (the Security tab, and the input from
+which Renovate opens vulnerability pull requests); its version and security
+updates are off. Setup of the runner and the shared preset:
+[renovate.md](../renovate.md).
 
-| Bot | Updates | Why |
-| --- | --- | --- |
-| **Renovate**, self-hosted | Every package ecosystem: NuGet (central package management, `global.json`, tool manifests), npm and pnpm, Python (`pyproject.toml`, `uv.lock`), Docker, pre-commit hooks, Bicep API versions, Pulumi SDKs | One shared configuration for every repository; commit type per package (`fix` for what ships, `build` otherwise); native auto-merge; rebases branches that fall behind `main`; Dependency Dashboard |
-| **Dependabot** | GitHub Actions only, plus **alerts** for everything | Regenerates the workflow lockfile (`actions.lock`) natively, which Renovate supports only experimentally; alerts feed the Security tab and Renovate's vulnerability pull requests |
+Why one bot: the rulesets keep two bars for people that bots cannot meet, a
+branch up to date with `main` and a passing `CodeQL` check
+([branching-and-commits](branching-and-commits.md)). Renovate's App is exempt
+from them; Dependabot cannot be made to pass them unattended. It never rebases
+a branch that is only behind `main`
+([dependabot-core #2224](https://github.com/dependabot/dependabot-core/issues/2224)),
+CodeQL deliberately leaves its pull requests unanalyzed (`neutral`,
+[codeql-action #2858](https://github.com/github/codeql-action/issues/2858)),
+and its auto-merge is enabled by `GITHUB_TOKEN`, which no ruleset can exempt.
 
-Dependabot **security updates are turned off** (`scripts/github_settings.py`):
-Renovate opens the vulnerability pull requests from the same alerts, at once,
-ignoring its schedule and the release-age delay, and two bots would open two
-pull requests for each advisory.
+## Rules
 
-Revisit this split when Renovate's lockfile support leaves its experimental
-stage: Renovate alone would then be simpler. The comparison behind it, with
-sources, is in [renovate.md](../renovate.md).
-
-## Rules for both bots
-
-- **Cooldown**: a version must have been public for a few days before a pull
-  request proposes it (Renovate `minimumReleaseAge: "3 days"`, Dependabot
-  `cooldown.default-days: 7`, GitHub's default being 3). A compromised release
-  is usually pulled within that window. Security updates skip it.
+- **Release age**: Renovate proposes a version once it has been public for
+  three days (`minimumReleaseAge: "3 days"`); a compromised release is usually
+  pulled within that window. Vulnerability fixes skip it and open at once.
 - **Small groups**: Renovate's monorepo groups (packages released together,
   such as `xunit.v3.*` or `@typescript-eslint/*`) and one pull request per
   package otherwise. A group of forty updates fails as a whole when one
   package breaks, and blocks thirty-nine good updates with it.
-- **Unattended merge of non-majors**: minor, patch, digest and lock file
-  maintenance updates merge on their own once `gate` is green; majors wait for
-  a person, who reads the release notes.
+- **Unattended merge of non-majors**: minor, patch, digest, pin and lock file
+  maintenance updates merge once the checks of the `main` ruleset pass; majors
+  wait for a person, who reads the release notes.
+- **Renovate merges itself** (`platformAutomerge: false`, `automergeType:
+  "pr"`): a merge made by the App is a direct merge by an exempt actor, which
+  GitHub honors; whether an exemption also covers GitHub's auto-merge is not
+  documented. It merges one branch per run, and the runner runs hourly.
+- **No rebasing for the sake of it** (`rebaseWhen: "conflicted"`): the App is
+  exempt from the "up to date" rule, so a branch is rebased only on conflict.
 - **Commit types decide releases**:
 
   | Update | Type | Releases |
@@ -38,71 +44,45 @@ sources, is in [renovate.md](../renovate.md).
 
   A major update of a shipped dependency may be breaking for consumers: when
   merging it by hand, retitle it `fix(deps)!:` if it is.
-- Bot pull requests are squash-merged under their title, like every pull
-  request.
-
-## Unattended merge, by profile
-
-**Solo profiles** (no required approval):
-
-- Renovate merges its own pull requests through GitHub auto-merge
-  (`platformAutomerge`), as its App: the merge triggers the workflows of `main`.
-- `templates/core/dot-github/workflows/dependabot-auto-merge.yml` queues
-  auto-merge on Dependabot's non-major action updates, on `pull_request`
-  (never `pull_request_target`), guarded by: author and actor are
-  `dependabot[bot]`, the branch belongs to the repository, and
-  `dependabot/fetch-metadata` classifies the update as a patch or a minor.
-- Required: "Allow auto-merge" in the repository settings, and the ruleset's
-  required checks, without which auto-merge would merge before CI ran.
-- Not required: "Require branches to be up to date". Leave it off (`strict:
-  false`): Renovate rebases its branches itself, but Dependabot rebases only on
-  conflict, and a strict rule leaves its pull requests waiting forever.
-
-**Team profiles** (one required approval):
-
-- The same workflow also **approves** non-major pull requests of both bots
-  (Renovate's carry the `automerge` label its preset adds), with
-  `GITHUB_TOKEN`; this needs "Allow GitHub Actions to create and approve pull
-  requests" (`scripts/github_settings.py --team` sets it).
-- CODEOWNERS gives the dependency manifests and lock files no owner, so that
-  approval is enough for them; workflows, the lockfile of actions and source
-  keep their code owners, so a bot update touching them still waits for a
-  person.
-
-A merge made with `GITHUB_TOKEN` (Dependabot's auto-merge) does not trigger
-the workflows of `main`; the next pull request, preview or release runs the
-full suite before anything ships.
+- **Actions and the workflow lockfile**: Renovate updates `uses:` pinned by
+  SHA with their version comment (`helpers:pinGitHubActionDigestsToSemver`
+  also pins any action added by tag), and regenerates
+  `.github/workflows/actions.lock`, a support still marked experimental. A
+  stale lockfile fails `lint.yml`'s `gh actions-lock --verify`, so such a pull
+  request stays open, red, for a person to fix with `gh actions-lock`; keep the
+  "Require lockfile" Actions policy off until Renovate's support is stable.
+- `*_VERSION` variables of workflows annotated `# renovate: datasource=...
+  depName=...` (actionlint, Semgrep, the lockfile extension) are kept current
+  by the preset's `customManagers:githubActionsVersions`.
 
 ## Templates
 
-- `templates/core/dot-github/dependabot.yml`: GitHub Actions only, in
-  `/` and `/.github/actions/*`, weekly, cooldown, one group for minor and patch
-  updates, `build` commit prefix.
-- `templates/core/dot-github/workflows/dependabot-auto-merge.yml`: queue
-  auto-merge (and approve, for teams).
 - `templates/renovate/renovate.json`: the repository's configuration, which
-  extends the account's shared preset and adds the modules' rules.
-- Each module's `renovate-rules.json`: `packageRules` to merge into
-  `renovate.json` (for .NET, the list of shipped packages that take `fix`).
+  extends the account's shared preset; each module's `renovate-rules.json`
+  adds its `packageRules` (for .NET, the shipped packages that take `fix`).
 - `templates/renovate/preset/` and `templates/renovate/runner/`: created once
   per account, see [renovate.md](../renovate.md).
+- No `dependabot.yml`: alerts need none. An existing one is removed (or
+  reduced to nothing) in audit mode, after showing the user.
 
 ## Manual steps
 
 - Once per account: the Renovate runner repository and its GitHub App
-  ([renovate.md](../renovate.md)); install the App on the new repository.
-- "Allow auto-merge" and the merge settings are applied by
-  `scripts/github_settings.py`.
+  ([renovate.md](../renovate.md)). Install the App on the new repository, and
+  give its ID to `scripts/github_settings.py --bots-app-id` so the
+  `main-human-gates` ruleset exempts it.
+- Check the exemption once, on the first Renovate pull request that becomes
+  behind `main`: it must merge without being rebased. If it waits, the
+  ruleset's bypass list is wrong.
 
 ## Audit checklist
 
-- Exactly one bot per ecosystem; Dependabot security updates off when Renovate
-  handles vulnerabilities.
-- A cooldown or release age is configured.
-- Non-majors merge without a person in practice: no required approval for a
-  solo maintainer, or an approving workflow for a team; no strict "up to date"
-  rule; "Allow auto-merge" on.
-- No workflow runs on `pull_request_target`.
+- One bot opens update pull requests: Renovate. Dependabot alerts on, its
+  version and security updates off.
+- A release age is configured.
+- The Renovate App is exempt from `main-human-gates` and merges non-majors
+  without a person.
+- No workflow runs on `pull_request_target`, none approves pull requests.
 - Commit types follow what ships.
-- Open bot pull requests older than two weeks: find what blocks them (a
-  required review, a red check, a strict rule) and report it.
+- Open update pull requests older than two weeks: find what blocks them (a red
+  check, a stale lockfile, a missing exemption) and report it.

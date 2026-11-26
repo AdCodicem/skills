@@ -7,14 +7,24 @@ releasable.
 
 ## The rules
 
-- **A ruleset on the default branch**, `main`, applied by
-  `scripts/github_settings.py`: no deletion, no force push, linear history,
-  changes only through pull requests, squash merges only, review threads
-  resolved, the required checks of [ci](ci.md) (`gate`, `pr-title`,
-  `workflows`, `pre-commit`), not strict (branches need not be up to date, so
-  bot pull requests never wait for a rebase that does not come). Required
-  approvals per profile ([profiles-and-tiers](../profiles-and-tiers.md)). The
-  release App is the only bypass actor.
+- **Two layered rulesets on the default branch**, applied by
+  `scripts/github_settings.py`. GitHub combines every ruleset that targets a
+  branch and applies the most restrictive version of each rule
+  ([rule layering](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets#about-rule-layering)),
+  so an actor exempt from one still meets the other:
+
+  | Ruleset | Applies to | Rules |
+  | --- | --- | --- |
+  | `main` | everyone; the release App may bypass (`always`) to push the changelog commit and the tag | no deletion, no force push, linear history, changes only through pull requests, squash only, review threads resolved, the required checks of [ci](ci.md) (`gate`, `pr-title`, `workflows`, `pre-commit`) **not strict** |
+  | `main-human-gates` | people; the bots' App (Renovate's) and the release App are **exempt** (`bypass_mode: exempt`: the rules are not evaluated for them) | the same checks **strict** (branch up to date with `main`), the `CodeQL` check where CodeQL is available ([security](security.md)), and for team profiles one approval from a code owner |
+
+  People get the full bar; Renovate's updates merge as soon as the `main`
+  checks pass, without being rebased and without anyone's review. Who may
+  bypass when GitHub's auto-merge merges is not documented, which is why
+  Renovate merges its pull requests itself
+  ([dependencies](dependencies.md)). Organization-owned public repositories
+  could use a merge queue instead of the "up to date" rule (it tests the merged
+  result for everyone, bots included); personal repositories cannot.
 - **Squash merges, with the pull request title and body as the commit**: the
   title must be a [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/),
   checked by `lint.yml`'s `pr-title` job, because it decides the next version

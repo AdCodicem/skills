@@ -1,6 +1,6 @@
 ---
 name: init
-description: 'Scaffold a new GitHub repository, or audit and upgrade an existing one, to a current and secure standard in any language. A fixed core (ruleset on main, squash merges with Conventional Commit titles, CI behind one gate check, semantic-release with approved and attested stable releases, trusted publishing, Renovate and Dependabot with unattended merges, pinned actions, security policy) plus modules picked from what the repository holds: .NET, Node/TypeScript libraries, React applications, Python, Bicep or Pulumi infrastructure, Cloudflare Wrangler, deployments to GitHub Pages, GHCR or Azure. Adapts to the profile (personal or company, open source or private), a maturity tier and the GitHub plan, and resolves the latest versions. Use when asked to initialize, set up, standardize, audit or upgrade a repository, its CI, release pipeline, dependency updates or settings. Examples: "set up this repo", "new TypeScript library", "audit this repo against my standards", "initialise ce repo", "mets ce repo à niveau".'
+description: 'Scaffold a new GitHub repository, or audit and upgrade an existing one, to a current and secure standard in any language. A fixed core (ruleset on main, squash merges with Conventional Commit titles, CI behind one gate check, semantic-release with approved and attested stable releases, trusted publishing, Renovate merging updates past human-only gates, pinned actions, security policy) plus modules picked from what the repository holds: .NET, Node/TypeScript libraries, React applications, Python, Bicep or Pulumi infrastructure, Cloudflare Wrangler, deployments to GitHub Pages, GHCR or Azure. Adapts to the profile (personal or company, open source or private), a maturity tier and the GitHub plan, and resolves the latest versions. Use when asked to initialize, set up, standardize, audit or upgrade a repository, its CI, release pipeline, dependency updates or settings. Examples: "set up this repo", "new TypeScript library", "audit this repo against my standards", "initialise ce repo", "mets ce repo à niveau".'
 metadata:
   surfaces: claude-code, claude-ai
 ---
@@ -161,11 +161,11 @@ Settings cannot be written as files. With `gh` installed and authenticated:
 python3 scripts/github_settings.py --repo <owner>/<name> --profile <profile> [options]
 ```
 
-It reads the current settings, prints what it would change (ruleset on `main`,
-merge options, auto-merge, private vulnerability reporting, secret scanning and
-push protection, immutable releases, CodeQL default setup, workflow token
-permissions, SHA pinning policy, environments), skips what the plan does not
-allow and says why. Show the plan to the user; run it again with `--apply` only
+It reads the current settings, prints what it would change (the `main` and
+`main-human-gates` rulesets, merge options, private vulnerability reporting,
+secret scanning and push protection, immutable releases, CodeQL default setup
+off, workflow token permissions, SHA pinning policy, environments), skips what
+the plan does not allow and says why. Show the plan to the user; run it again with `--apply` only
 after they agree. Options and what each setting does:
 [references/settings.md](references/settings.md). Without `gh`, give the user
 the same list as manual steps.
@@ -201,12 +201,12 @@ Every repository gets these, at every tier, unless the GitHub plan forbids it
 | --- | --- | --- |
 | Hygiene | `.editorconfig`, `.gitattributes`, `.gitignore`, pre-commit hooks, pinned toolchain | [hygiene](references/areas/hygiene.md) |
 | Governance | LICENSE, README, CONTRIBUTING, SECURITY, CODEOWNERS | [governance](references/areas/governance.md) |
-| Branching | GitHub Flow, ruleset on `main`, squash merges, Conventional Commit PR titles | [branching-and-commits](references/areas/branching-and-commits.md) |
+| Branching | GitHub Flow, two layered rulesets (`main` for everyone; `main-human-gates`, with up-to-date branches, the `CodeQL` check and team approvals, that the bots' App is exempt from), squash merges, Conventional Commit PR titles | [branching-and-commits](references/areas/branching-and-commits.md) |
 | CI | One `gate` check over every job, least-privilege tokens, actions pinned by SHA and locked, actionlint and zizmor | [ci](references/areas/ci.md) |
 | Quality | Warnings as errors, format check, tests on every pull request | [quality](references/areas/quality.md) |
 | Release | Merging publishes nothing; stable releases on an approved dispatch, drafted, attested, then immutable; trusted publishing; 0.x until stable | [release](references/areas/release.md) |
-| Dependencies | Renovate for packages, Dependabot for actions and alerts, cooldown, unattended merge of non-majors, `fix(deps)` only for what ships | [dependencies](references/areas/dependencies.md) |
-| Security | Security policy, private vulnerability reporting, secret scanning and push protection, CodeQL | [security](references/areas/security.md) |
+| Dependencies | Renovate for every ecosystem, actions included, merging non-majors itself; Dependabot alerts only; release age; `fix(deps)` only for what ships | [dependencies](references/areas/dependencies.md) |
+| Security | Security policy, private vulnerability reporting, secret scanning and push protection; CodeQL advanced setup with a required check, or Semgrep on private code without Code Security | [security](references/areas/security.md) |
 | Agents | A `CLAUDE.md` with the repository's rules | [agents](references/areas/agents.md) |
 
 The profile and the tier add the optional components (community files,
@@ -256,7 +256,7 @@ references/
   profiles-and-tiers.md     Profiles, tiers, and what each adds
   github-plans.md           What each GitHub plan allows, and how the skill adapts
   settings.md               github_settings.py options, settings and manual steps
-  renovate.md               Hybrid Renovate and Dependabot model, the central runner
+  renovate.md               Self-hosted Renovate: why, the runner, the shared preset
   areas/                    The fixed core, one file per area
   ecosystems/               dotnet.md, node.md, react.md, python.md
   iac/                      choosing.md, bicep.md, pulumi.md, cloudflare.md, ops-repo.md

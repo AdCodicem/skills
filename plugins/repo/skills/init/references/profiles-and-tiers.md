@@ -13,8 +13,8 @@ user.
 | License | MIT (ask for the holder) | ask; none is a valid answer (all rights reserved) | ask (often proprietary: no LICENSE, or the company's) | ask (MIT or Apache-2.0 are common) |
 | Code of Conduct, FUNDING, Discussions | yes (standard tier and up) | no | no | Code of Conduct yes; FUNDING and Discussions ask |
 | CODEOWNERS | `* @{{codeowner}}` | `* @{{codeowner}}` | teams per path (`@org/team`) | teams per path |
-| Required approvals on `main` | 0 (solo: the gate check protects `main`) | 0 | 1, code owners | 1, code owners |
-| Unattended dependency merges | auto-merge when `gate` is green | same | a workflow approves non-major bot PRs, then auto-merge | same as company private |
+| Required approvals for people (`main-human-gates`) | 0 (solo: the checks protect `main`) | 0 | 1, code owners | 1, code owners |
+| Unattended dependency merges | Renovate merges non-majors once the `main` checks pass; its App is exempt from the human gates | same | same | same |
 | Scorecard, Codecov | yes (standard tier and up) | no Scorecard (needs Advanced Security); Codecov free for 1 user | ask | yes |
 | Private vulnerability reporting | yes | not available (public repositories only) | not available | yes |
 | Infrastructure | private operations repository ([ops-repo](iac/ops-repo.md)) | `infra/` in the repository | `infra/` in the repository; a dedicated repository on request | private operations repository |
@@ -33,19 +33,19 @@ no force push, no deletion, linear history) and the `gate` check. Scorecard's
 Code-Review check stays low; auto-approving with a bot to raise it would be
 dishonest, so the skill does not do it for solo profiles.
 
-For teams, approval matters. A workflow approves non-major pull requests opened
-by Renovate or Dependabot (see [dependencies](areas/dependencies.md)); the
-dependency manifests have no code owner, so that approval is enough, while
-workflows and source keep theirs.
+For teams, approval matters, and it lives in the `main-human-gates` ruleset,
+which Renovate's App is exempt from: people need a code owner's approval, bot
+updates need none, and no workflow approves anything
+([branching-and-commits](areas/branching-and-commits.md)).
 
 ## Tiers
 
 | Component | Minimal | Standard | Complete |
 | --- | --- | --- | --- |
-| Fixed core (hygiene, governance basics, ruleset, CI with `gate`, PR title lint, Renovate and Dependabot, release when the project publishes or deploys, security basics, `CLAUDE.md`, pre-commit) | ✓ | ✓ | ✓ |
+| Fixed core (hygiene, governance basics, the two rulesets, CI with `gate`, PR title lint, Renovate, release when the project publishes or deploys, security basics, `CLAUDE.md`, pre-commit) | ✓ | ✓ | ✓ |
 | Issue forms, pull request template, `SUPPORT` contact links | | ✓ | ✓ |
 | Code of Conduct, FUNDING, Discussions (per profile) | | ✓ | ✓ |
-| CodeQL default setup (where the plan allows it) | | ✓ | ✓ |
+| Static analysis gate: CodeQL advanced setup and its required check, or Semgrep on private code without Code Security | | ✓ | ✓ |
 | Scorecard workflow and badge, Codecov (public profiles) | | ✓ | ✓ |
 | Stale issues and pull requests workflow | | ✓ | ✓ |
 | `docs/adr/` with the first record | | ✓ | ✓ |

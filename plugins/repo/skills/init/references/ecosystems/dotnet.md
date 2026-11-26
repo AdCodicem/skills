@@ -129,8 +129,11 @@ dotnet sln add src/{{project}} tests/{{project}}.Tests
   ```
 
   Remove the rule when nothing ships as a dependency.
-- **CodeQL default setup** supports C# with build mode `none`: no workflow to
-  maintain (`scripts/github_settings.py` enables it where the plan allows).
+- **CodeQL** analyzes C# with build mode `none` (no build in the workflow):
+  keep the `csharp` entry of `codeql.yml`'s matrix
+  ([security](../areas/security.md)). Turn on the SDK's security rules too:
+  `<AnalysisModeSecurity>All</AnalysisModeSecurity>` in
+  `Directory.Build.props`, so they fail the build with warnings as errors.
 
 ## Packaging and release
 

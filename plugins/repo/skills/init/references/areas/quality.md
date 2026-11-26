@@ -24,6 +24,9 @@ ecosystem files; this file says what must hold for all of them.
   delete code only because no test reaches it; a defensive branch stays.
 - **Type checking is on** where the language has it: nullable reference types
   in .NET, `strict` TypeScript, mypy strict for Python.
+- **Security analysis gates people's pull requests**: CodeQL's required check
+  where CodeQL is available, Semgrep inside `gate` elsewhere, and each
+  ecosystem's security rules in its linter ([security](security.md)).
 - **Every optimization ships with its benchmark** (complete tier): benchmarks
   run on demand, never on shared runners for every pull request, where timings
   are noise.

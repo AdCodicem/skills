@@ -40,7 +40,9 @@ def load(path: Path):
 YAML_FILES = sorted(p for p in TEMPLATES.rglob("*") if p.suffix in {".yml", ".yaml"})
 JSON_FILES = sorted(p for p in TEMPLATES.rglob("*.json"))
 WORKFLOW_FILES = [p for p in YAML_FILES if "workflows" in p.parts or p.parent.name == "deploy"] + [
-    p for p in YAML_FILES if p.name in {"ci-jobs.yml", "deploy.yml", "container.yml", "staging.yml"}
+    p
+    for p in YAML_FILES
+    if p.name.startswith("ci-jobs") or p.name in {"deploy.yml", "container.yml", "staging.yml"}
 ]
 WORKFLOW_FILES = sorted(set(WORKFLOW_FILES))
 STEP_FILES = sorted(
@@ -145,8 +147,10 @@ def test_module_ci_jobs_are_prefixed(folder, prefix):
 def test_fragments_assemble_into_one_ci_workflow():
     ci = load(TEMPLATES / "core/dot-github/workflows/ci.yml")
     gate = ci["jobs"].pop("gate")
-    for folder in MODULE_PREFIXES:
-        jobs = jobs_of(load(TEMPLATES / folder / "ci-jobs.yml"))
+    fragments = [TEMPLATES / folder / "ci-jobs.yml" for folder in MODULE_PREFIXES]
+    for fragment in [*fragments, TEMPLATES / "core/ci-jobs-semgrep.yml"]:
+        folder = rel(fragment)
+        jobs = jobs_of(load(fragment))
         assert not set(jobs) & set(ci["jobs"]), f"{folder}: job ids collide"
         ci["jobs"].update(jobs)
     gate["needs"] = list(ci["jobs"])

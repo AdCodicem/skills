@@ -21,9 +21,9 @@ Templates: `templates/core/` (`LICENSE`, `README.md`, `CONTRIBUTING.md`,
   passing criterion), the supported versions, and how to verify a release's
   attestation.
 - **CODEOWNERS**: the profile's owners, `.github/` and the workflow lockfile
-  always owned; for team profiles, the dependency manifests unowned so bot
-  updates need only the workflow's approval
-  ([dependencies](dependencies.md)).
+  always owned. Team profiles require a code owner's approval through the
+  `main-human-gates` ruleset, which Renovate's App is exempt from
+  ([branching-and-commits](branching-and-commits.md)).
 
 ## Standard tier and up
 

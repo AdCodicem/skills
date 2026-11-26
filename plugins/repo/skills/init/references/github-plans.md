@@ -13,6 +13,7 @@ Public repositories get every feature below for free, on every plan.
 | Environments, deployment branches, environment secrets | yes | **no** | yes | yes | yes |
 | Environment required reviewers, wait timers | yes | no | **no** | **no** | yes |
 | CodeQL, secret scanning, push protection | yes | no | no | paid add-ons: Code Security ($30) and Secret Protection ($19) per active committer per month | add-ons |
+| CodeQL CLI in CI (license) | yes (open source code) | no | no | only with Code Security | only with Code Security |
 | Artifact attestations | yes | no | no | no | yes |
 | Private vulnerability reporting | yes | no | no | no | no |
 | GitHub Pages | yes | no | yes | yes | yes |
@@ -58,7 +59,8 @@ the token can see it, the plan. Then:
   reviewers on environments: the release and production gates are a
   `workflow_dispatch` restricted to the `main` branch through the environment's
   deployment branch rule. No attestations, no CodeQL or secret scanning unless
-  the add-ons are bought (ask before assuming they are).
+  the add-ons are bought (ask before assuming they are): Semgrep Community
+  Edition runs in `ci.yml` instead ([security](areas/security.md)).
 - **Private, Enterprise Cloud**: everything, as for public repositories, except
   private vulnerability reporting.
 - **Codecov on private**: free for one user; for a team, ask, or keep coverage
