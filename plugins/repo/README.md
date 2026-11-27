@@ -35,6 +35,7 @@ and audits an existing repository; it always proposes a plan before writing.
 | Type | Name | Surfaces | Description |
 | --- | --- | --- | --- |
 | Skill | `/repo:init` | Claude Code, claude.ai | Scaffold or audit a repository: detection, plan, files, settings, verification |
+| Hook | `UserPromptSubmit` | Claude Code, Cowork | For repository setup and audit requests (CI, releases, Renovate, rulesets, infrastructure as code), reminds Claude to load `/repo:init`, even for a request about one part |
 
 On claude.ai the skill is named `repo-init`: download `repo-init.zip` from the
 latest [`repo-v*` release](https://github.com/AdCodicem/skills/releases?q=repo-v&expanded=true)
@@ -65,7 +66,10 @@ What happens:
 
 ## Requirements
 
-- Python 3.11 or later, standard library only, for the three scripts.
+- Python 3.11 or later, standard library only, for the three scripts and the
+  hook. On Windows, `python3` may be the Microsoft Store stub: the hook command
+  tries `python3`, `python` then `py` through `sh` (Git Bash); without Git Bash
+  it does nothing and the skill relies on its description alone.
 - Network access for `latest_versions.py` (github.com, builds.dotnet.microsoft.com,
   nodejs.org, raw.githubusercontent.com, peps.python.org, registry.npmjs.org,
   api.nuget.org, pypi.org, mcr.microsoft.com); without it, the skill
