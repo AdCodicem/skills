@@ -1,0 +1,24 @@
+# Fragment: steps for the `publish` job of release.yml (and preview.yml) when
+# the repository ships a container image. The image was built and attested by
+# container.yml for the released commit; publishing only adds version tags to
+# that digest, so users pull exactly what staging and production ran. Nothing
+# is built here.
+#
+# The `publish` job needs `packages: write`, and `needs.image` (release-jobs.yml).
+# Tags: <version>, <major>.<minor>, latest. A preview adds <preview version>
+# only, never `latest`: drop the last two tags in preview.yml.
+
+steps:
+  - name: Tag the image with the version
+    env:
+      GH_TOKEN: ${{ github.token }}
+      DIGEST: ${{ needs.image.outputs.digest }}
+      REPOSITORY: ${{ github.repository }}
+      VERSION: ${{ needs.plan.outputs.next_version }}
+    run: |
+      image="ghcr.io/${REPOSITORY,,}"
+      skopeo login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<<"$GH_TOKEN"
+      minor="${VERSION%.*}"
+      for tag in "$VERSION" "$minor" latest; do
+        skopeo copy --all --preserve-digests "docker://$image@$DIGEST" "docker://$image:$tag"
+      done

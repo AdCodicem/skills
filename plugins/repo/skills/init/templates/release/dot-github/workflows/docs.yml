@@ -1,0 +1,74 @@
+name: docs
+
+# Complete tier. Builds the Docusaurus site with the generated API reference
+# and deploys it to GitHub Pages. Called by release.yml after a stable release
+# (the snapshot of the new version is in the release commit, hence `ref`) and
+# by preview.yml after a preview; ci.yml builds the site on every pull request.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit or tag to build
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: The commit or tag to build
+        type: string
+        default: main
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # Paste each module's docs-api.yml steps here: they write the API
+      # reference as Markdown into docs/website/docs/reference/api/.
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: docs/website/.nvmrc
+          # No cache in a job whose output is published.
+          package-manager-cache: false
+
+      - name: Build the site
+        working-directory: docs/website
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/website/build
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

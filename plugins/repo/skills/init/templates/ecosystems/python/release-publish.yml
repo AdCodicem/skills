@@ -1,0 +1,10 @@
+# Fragment: steps for the `publish` job of release.yml and preview.yml (environment
+# `release` or `preview`, `id-token: write`). Builds nothing: dist/pypi comes from `pack`.
+# Trusted publishing (OIDC): no token. The action generates and uploads PEP 740
+# attestations by default; they go to the public Sigstore log, which names the repository.
+steps:
+  - name: Publish to PyPI
+    uses: pypa/gh-action-pypi-publish@v1.14.3
+    with:
+      packages-dir: dist/pypi/
+      skip-existing: true

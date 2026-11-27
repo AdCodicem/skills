@@ -1,18 +1,13 @@
 # dotnet
 
-Skills for .NET development, in two groups:
+Skills for .NET development: make Claude write, review, modernize and upgrade
+code with what C# 14 and 15, .NET 10 and 11, ASP.NET Core, EF Core and the SDK
+added: new syntax where it reads better, safer defaults, faster APIs, and the
+obsolete APIs and breaking changes to avoid. Every skill first detects the
+project's target framework and C# version, and only uses what it supports.
 
-- **Modern C# and .NET**: make Claude write, review, modernize and upgrade code
-  with what C# 14 and 15, .NET 10 and 11, ASP.NET Core, EF Core and the SDK
-  added: new syntax where it reads better, safer defaults, faster APIs, and the
-  obsolete APIs and breaking changes to avoid. Every skill first detects the
-  project's target framework and C# version, and only uses what it supports.
-- **Repository scaffolding**: `repo-init` scaffolds a new personal open-source
-  .NET repository, or audits and upgrades an existing one, to a standard
-  toolchain: latest LTS SDK, analyzers and code style, xUnit and Testcontainers
-  tests, Conventional Commits with semantic-release, NuGet trusted publishing,
-  Docusaurus docs with a generated API reference, CodeQL, Scorecard and
-  Dependabot.
+Repository scaffolding (CI, releases, NuGet publishing, documentation) moved to
+the language-agnostic [`repo`](../repo) plugin: `/repo:init`.
 
 ## Install
 
@@ -33,13 +28,6 @@ Skills for .NET development, in two groups:
 | Skill | `/dotnet:migrate` | Claude Code | Upgrade a solution to .NET 10 or 11 and work through the breaking changes |
 | Agent | `modernization-auditor` | Claude Code | Read-only audit of a codebase: modernization, obsolete APIs, upgrade risks |
 | Hook | `UserPromptSubmit` | Claude Code, Cowork | For .NET requests, reminds Claude which of the skills above to load, even for short snippets |
-| Skill | `/dotnet:repo-init` | Claude Code, claude.ai | Scaffold or upgrade a personal open-source .NET repository |
-
-On claude.ai the skill is named `dotnet-repo-init`: download
-`dotnet-repo-init.zip` from the latest
-[`dotnet-v*` GitHub release](https://github.com/AdCodicem/skills/releases?q=dotnet-v&expanded=true)
-and upload it under Customize > Skills. Releases from 1.0.1 onward include the
-zip.
 
 ## Usage
 
@@ -77,38 +65,13 @@ How they behave:
 - **Verification**: when the Microsoft Learn MCP server is connected, the skills
   check uncertain details there.
 
-### Repository scaffolding
-
-- "Set up a new .NET library repository with my standards" or "Initialise ce repo .NET"
-- "Upgrade this C# repository to my standard toolchain"
-
-It only triggers for .NET repositories: a generic "initialize this repo" in a
-Node.js or Python project leaves it alone.
-
-The skill lists what it will create or change and asks for confirmation before
-writing files. It ends with the manual steps it cannot do for you (NuGet trusted
-publisher, Codecov token, repository settings).
-
-Before generating files, the skill runs `scripts/latest_versions.py`. It reports
-the current .NET and Node.js LTS releases and flags every outdated pin in the
-templates (SDK, target framework, `node-version`, GitHub Actions), so generated
-files never start out of date. During an upgrade, `--root <repository>` checks
-an existing repository the same way.
-
 ## Requirements
 
-- Python 3 (standard library only) for `detect_target.py`, `latest_versions.py`
-  and the hook. On Windows, `python3` may be the Microsoft Store stub: the skills
-  fall back to `python`, and the hook command tries `python3`, `python` then `py`
-  through `sh` (Git Bash). Without Git Bash the hook does nothing and the skills
+- Python 3 (standard library only) for `detect_target.py` and the hook. On
+  Windows, `python3` may be the Microsoft Store stub: the skills fall back to
+  `python`, and the hook command tries `python3`, `python` then `py` through
+  `sh` (Git Bash). Without Git Bash the hook does nothing and the skills
   rely on their descriptions alone.
 - The .NET SDK for `detect_target.py --evaluate` and to build and test the code.
 - Optional: the [Microsoft Learn MCP server](https://github.com/MicrosoftDocs/mcp)
   to verify details that the bundled references do not cover.
-- `latest_versions.py` needs network access to builds.dotnet.microsoft.com,
-  nodejs.org and github.com; without it, `repo-init` falls back to a web search.
-- The generated repository needs the .NET SDK, Node.js (for semantic-release
-  and Docusaurus) and Docker (for Testcontainers).
-
-Templates whose real name starts with a dot are stored with a `dot-` prefix
-(`templates/dot-github/` for `.github/`), because claude.ai drops dotfiles.

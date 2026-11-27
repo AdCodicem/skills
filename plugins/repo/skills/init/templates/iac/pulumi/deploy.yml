@@ -1,0 +1,144 @@
+# Applies the infrastructure with Pulumi: staging on every push to main, production
+# after the `production` environment's approval (references/iac/pulumi.md).
+# Replace each `# {{pulumi-toolchain-setup}}` line with the `setup` steps of
+# toolchains/<language>.yml. {{infra-dir}} is `infra` in an application repository,
+# `.` in an operations repository.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    # In an operations repository, remove `paths`: everything in it is infrastructure.
+    paths:
+      - "{{infra-dir}}/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions: {}
+
+jobs:
+  staging:
+    if: github.event_name == 'push' || inputs.environment == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      # A secret of the `staging` environment; remove without Cloudflare resources.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # {{pulumi-toolchain-setup}}
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: pulumi/actions@v7
+        with:
+          command: up
+          stack-name: staging
+          work-dir: "{{infra-dir}}"
+          cloud-url: ${{ vars.PULUMI_BACKEND_URL }}
+          pulumi-version-file: "{{infra-dir}}/.pulumi.version"
+          comment-on-summary: true
+          suppress-outputs: true
+
+  # Read-only preview of production, so the reviewer reads the plan in this job's
+  # summary before approving `production`. Uses the plan identity, whose federated
+  # credential for this job is repo:{{owner}}/{{repo}}:ref:refs/heads/main.
+  production-plan:
+    needs: staging
+    if: >-
+      always() &&
+      (needs.staging.result == 'success' ||
+       (github.event_name == 'workflow_dispatch' && inputs.environment == 'production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PLAN_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # {{pulumi-toolchain-setup}}
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: pulumi/actions@v7
+        with:
+          command: preview
+          stack-name: production
+          work-dir: "{{infra-dir}}"
+          cloud-url: ${{ vars.PULUMI_BACKEND_URL }}
+          pulumi-version-file: "{{infra-dir}}/.pulumi.version"
+          comment-on-summary: true
+          suppress-outputs: true
+
+  # The environment's required reviewer approves this job. Where the plan has no
+  # required reviewers (private repositories below Enterprise Cloud), production
+  # must only run on a deliberate dispatch: replace the `if:` below with
+  #   if: github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
+  production:
+    needs: production-plan
+    if: always() && needs.production-plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # {{pulumi-toolchain-setup}}
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: pulumi/actions@v7
+        with:
+          command: up
+          stack-name: production
+          work-dir: "{{infra-dir}}"
+          cloud-url: ${{ vars.PULUMI_BACKEND_URL }}
+          pulumi-version-file: "{{infra-dir}}/.pulumi.version"
+          comment-on-summary: true
+          suppress-outputs: true

@@ -1,0 +1,7 @@
+# Fragment: steps for the documentation site build (ci.yml's site job and docs.yml),
+# before the Docusaurus build. Writes the API reference as Markdown, with Docusaurus
+# front matter and a sidebar, into docs/website/docs/reference/api (ignored by git).
+# Inputs: the repository checked out, pnpm and Node.js set up, dependencies installed.
+steps:
+  - name: Generate the API reference
+    run: pnpm run docs:api

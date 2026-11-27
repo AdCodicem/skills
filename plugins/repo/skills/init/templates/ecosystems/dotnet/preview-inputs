@@ -1,0 +1,6 @@
+src/
+Directory.Build.props
+Directory.Packages.props
+global.json
+nuget.config
+README.md

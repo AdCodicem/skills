@@ -1,0 +1,28 @@
+# Fragment: steps for the `pack` job of release.yml and preview.yml, after the
+# checkout. No credential is available here, and none is needed.
+#
+# Inputs (job environment, set by the core workflow):
+#   VERSION       the version to stamp: 1.4.0, or 1.4.0-preview.37 for a preview
+#   LAST_VERSION  the last stable release (0.0.0 before the first one)
+# Output: dist/nuget/*.nupkg and *.snupkg
+steps:
+  - uses: actions/setup-dotnet@v6
+    with:
+      global-json-file: global.json
+
+  - name: Restore
+    run: dotnet restore
+
+  # ReleaseBaselineVersion turns on API compatibility checks against the last
+  # release (Directory.Build.props); a package never released opts out with
+  # SkipPackageValidationBaseline. The baseline package is restored from
+  # nuget.org, so the check runs only once a release exists.
+  - name: Pack
+    run: >-
+      dotnet pack --configuration Release --no-restore
+      --output dist/nuget
+      -p:Version="$VERSION"
+      -p:ReleaseBaselineVersion="$LAST_VERSION"
+
+  - name: List the packages
+    run: ls -l dist/nuget

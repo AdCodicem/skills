@@ -1,0 +1,14 @@
+{
+  "packageRules": [
+    {
+      "description": "The two TypeScript compilers (6.0 for tools, 7 native for tsc) move together.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "typescript",
+        "@typescript/native",
+        "@typescript/typescript6"
+      ],
+      "groupName": "TypeScript"
+    }
+  ]
+}

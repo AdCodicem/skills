@@ -1,0 +1,91 @@
+name: deploy
+
+# Azure Container Apps target: points the environment's container app at the
+# image container.yml built for the commit (ghcr.io/{{owner}}/{{repo}}:sha-<commit>),
+# as a new revision named after the version. Each GitHub environment has its
+# own container app (`{{project}}-staging`, `{{project}}`). Signs in with OIDC.
+# Copy to .github/workflows/deploy.yml.
+#
+# Variables of each GitHub environment (identifiers, not secrets):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#   AZURE_RESOURCE_GROUP, AZURE_CONTAINER_APP
+#
+# A private image needs registry credentials on the container app (a GHCR
+# token held by the app, or Azure Container Registry with a managed identity);
+# a public image needs none.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: staging or production.
+        type: string
+        required: true
+      ref:
+        description: Commit whose sha-<commit> image to deploy.
+        type: string
+        required: true
+      version:
+        description: Version label, used in the revision name.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        default: production
+      ref:
+        description: Full commit SHA whose image to deploy; an older release's commit rolls back.
+        type: string
+        required: true
+      version:
+        description: Version label, for example 1.4.2.
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.url.outputs.url }}
+    env:
+      GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      APP: ${{ vars.AZURE_CONTAINER_APP }}
+      IMAGE: ghcr.io/${{ github.repository }}:sha-${{ inputs.ref }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Revision suffixes allow lowercase letters, digits and hyphens, and must
+      # be new: the run number keeps a redeployment of a version unique.
+      - name: Deploy a new revision
+        run: |
+          label=$(printf '%s' "v$VERSION" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | cut -c1-16 | sed 's/-*$//')
+          suffix="$label-r$GITHUB_RUN_NUMBER-$GITHUB_RUN_ATTEMPT"
+          az containerapp update --name "$APP" --resource-group "$GROUP" --image "${IMAGE,,}" --revision-suffix "$suffix"
+
+      - name: Environment URL
+        id: url
+        run: |
+          fqdn=$(az containerapp show --name "$APP" --resource-group "$GROUP" --query properties.configuration.ingress.fqdn --output tsv)
+          echo "url=https://$fqdn" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke check
+        env:
+          URL: ${{ steps.url.outputs.url }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors --output /dev/null "$URL"

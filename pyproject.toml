@@ -17,3 +17,5 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "PTH"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "plugins", "examples"]
 addopts = "--import-mode=importlib"
+# Files under a skill's templates/ are copied into other repositories, never run here.
+norecursedirs = [".*", "build", "dist", "node_modules", "venv", "templates"]

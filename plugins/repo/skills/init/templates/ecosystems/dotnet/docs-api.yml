@@ -1,0 +1,20 @@
+# Fragment: steps that generate the API reference, run before the Docusaurus
+# build in the documentation CI job and in docs.yml (complete tier).
+#
+# DocFX reads the XML documentation comments of the projects under src/ and
+# writes Markdown into docs/website/docs/reference/api/, which git ignores. The
+# postprocess script turns DocFX's HTML heading anchors into Docusaurus heading
+# ids, keeping every cross-reference DocFX generates.
+steps:
+  - uses: actions/setup-dotnet@v6
+    with:
+      global-json-file: global.json
+
+  - name: Restore the local tools
+    run: dotnet tool restore
+
+  - name: Generate the API reference
+    run: dotnet docfx metadata docs/docfx/docfx.json
+
+  - name: Adapt the Markdown to Docusaurus
+    run: python3 .github/scripts/docfx-postprocess.py docs/website/docs/reference/api

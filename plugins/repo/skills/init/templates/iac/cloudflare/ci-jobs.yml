@@ -1,0 +1,28 @@
+# Wrangler job for ci.yml (references/iac/cloudflare.md). Paste under `jobs:`, above
+# `gate`, and add `wrangler-check` to `gate.needs`. It bundles the Worker without
+# credentials, so it runs on fork pull requests too.
+jobs:
+  wrangler-check:
+    name: wrangler check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Wrangler is a devDependency of the project, so Renovate updates it.
+      # The generated runtime types are committed: regenerate them and fail on drift.
+      - name: Runtime types are current
+        run: |
+          pnpm exec wrangler types
+          git diff --exit-code -- worker-configuration.d.ts
+      - name: Bundle without deploying
+        run: pnpm exec wrangler deploy --dry-run --outdir "$RUNNER_TEMP/wrangler" --env production

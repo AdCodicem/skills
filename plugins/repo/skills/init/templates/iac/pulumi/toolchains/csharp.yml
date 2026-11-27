@@ -1,0 +1,11 @@
+# Toolchain of a Pulumi program in C# (references/iac/pulumi.md): paste `setup`
+# where ci-jobs.yml and deploy.yml say `# {{pulumi-toolchain-setup}}`, and `test`
+# where ci-jobs.yml says `# {{pulumi-toolchain-test}}`.
+setup:
+  - uses: actions/setup-dotnet@v6
+    with:
+      global-json-file: global.json
+test:
+  - name: Unit tests (Pulumi mocks)
+    working-directory: "{{infra-dir}}"
+    run: dotnet test --configuration Release

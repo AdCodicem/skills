@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Shared Renovate preset of {{owner}}: Renovate updates every ecosystem, GitHub Actions included, and merges non-major updates itself as its App, which is exempt from the main-human-gates ruleset (see the repo-init skill, references/renovate.md).",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":enablePreCommit",
+    "helpers:pinGitHubActionDigestsToSemver",
+    "customManagers:githubActionsVersions"
+  ],
+  "timezone": "{{timezone}}",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "rebaseWhen": "conflicted",
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 10,
+  "labels": [
+    "dependencies"
+  ],
+  "semanticCommitType": "build",
+  "semanticCommitScope": "deps",
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "minimumReleaseAge": null
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on monday"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Non-major updates merge on their own once the required checks pass.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest",
+        "lockFileMaintenance"
+      ],
+      "automerge": true
+    },
+    {
+      "description": "Majors wait for a person, who reads the release notes.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false
+    },
+    {
+      "description": "A dependency that ships inside the package releases a patch.",
+      "matchDepTypes": [
+        "dependencies",
+        "peerDependencies",
+        "project.dependencies",
+        "project.optional-dependencies"
+      ],
+      "semanticCommitType": "fix"
+    },
+    {
+      "description": "Docker and GHCR images publish no release timestamp outside Docker Hub: do not hold them forever.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    }
+  ]
+}

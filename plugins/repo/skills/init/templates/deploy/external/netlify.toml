@@ -1,0 +1,23 @@
+# Netlify builds and deploys through its Git integration: production from main,
+# a deploy preview for every pull request. Nothing here holds a credential.
+# Keep the build command in sync with the React module (references/ecosystems/react.md).
+
+[build]
+  command = "pnpm install --frozen-lockfile && pnpm run build"
+  publish = "dist"
+
+[build.environment]
+  # The Node.js major the repository pins (.nvmrc); Netlify also reads .nvmrc.
+  NODE_VERSION = "{{node-lts}}"
+
+# Single-page application: every unknown path serves index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

@@ -1,0 +1,17 @@
+# Toolchain of a Pulumi program in Python (references/iac/pulumi.md): paste `setup`
+# where ci-jobs.yml and deploy.yml say `# {{pulumi-toolchain-setup}}`, and `test`
+# where ci-jobs.yml says `# {{pulumi-toolchain-test}}`.
+setup:
+  - uses: astral-sh/setup-uv@v10
+    with:
+      enable-cache: false
+  - name: Install
+    working-directory: "{{infra-dir}}"
+    run: uv sync --locked
+test:
+  - name: Lint
+    working-directory: "{{infra-dir}}"
+    run: uv run ruff check .
+  - name: Unit tests (Pulumi mocks)
+    working-directory: "{{infra-dir}}"
+    run: uv run pytest

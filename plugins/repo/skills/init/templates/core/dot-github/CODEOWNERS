@@ -1,0 +1,8 @@
+# Code owners review the paths they own. The main-human-gates ruleset requires
+# their approval for team profiles; the bots' App is exempt from it. Later
+# lines win.
+* @{{codeowner}}
+
+# Workflows and their lockfile always need a code owner.
+/.github/ @{{codeowner}}
+/.github/workflows/actions.lock @{{codeowner}}

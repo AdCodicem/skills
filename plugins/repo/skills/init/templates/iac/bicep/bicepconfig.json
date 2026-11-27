@@ -1,0 +1,30 @@
+{
+  "analyzers": {
+    "core": {
+      "enabled": true,
+      "rules": {
+        "no-unused-params": { "level": "error" },
+        "no-unused-vars": { "level": "error" },
+        "no-unused-existing-resources": { "level": "error" },
+        "no-unnecessary-dependson": { "level": "error" },
+        "no-hardcoded-env-urls": { "level": "error" },
+        "no-hardcoded-location": { "level": "error" },
+        "outputs-should-not-contain-secrets": { "level": "error" },
+        "protect-commandtoexecute-secrets": { "level": "error" },
+        "secure-parameter-default": { "level": "error" },
+        "secure-params-in-nested-deploy": { "level": "error" },
+        "secure-params-in-parameters-file": { "level": "error" },
+        "secure-secrets-in-params": { "level": "error" },
+        "use-secure-value-for-secure-inputs": { "level": "error" },
+        "use-stable-resource-identifiers": { "level": "error" },
+        "use-resource-symbol-reference": { "level": "error" },
+        "use-parent-property": { "level": "error" },
+        "use-safe-access": { "level": "error" },
+        "use-description-params": { "level": "warning" },
+        "use-recent-api-versions": { "level": "warning", "maxAgeInDays": 730 },
+        "use-recent-module-versions": { "level": "warning" },
+        "what-if-short-circuiting": { "level": "warning" }
+      }
+    }
+  }
+}

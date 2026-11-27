@@ -1,0 +1,44 @@
+{
+  "name": "{{package}}",
+  "version": "0.0.0-managed-by-semantic-release",
+  "description": "{{description}}",
+  "keywords": [],
+  "license": "MIT",
+  "author": "{{copyright-holder}}",
+  "homepage": "https://github.com/{{owner}}/{{repo}}#readme",
+  "bugs": "https://github.com/{{owner}}/{{repo}}/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/{{owner}}/{{repo}}.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">={{node-oldest-lts}}"
+  },
+  "packageManager": "pnpm@{{pnpm-version}}",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc && tsc --noEmit -p tsconfig.lib.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "check:package": "publint --strict && attw --pack . --profile esm-only",
+    "docs:api": "typedoc"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "//": "Merge into renovate.json (references/iac/pulumi.md). Replace {{infra-dir}} with `infra` in an application repository; in an operations repository use `**`.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pulumi CLI version read by pulumi/actions (pulumi-version-file)",
+      "managerFilePatterns": ["/(^|/)\\.pulumi\\.version$/"],
+      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "depNameTemplate": "pulumi/pulumi",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "The Pulumi SDK, its providers and the CLI move together",
+      "matchPackageNames": ["/^@pulumi\\//", "/^Pulumi(\\.|$)/", "/^pulumi(-|$)/", "pulumi/pulumi"],
+      "groupName": "pulumi"
+    },
+    {
+      "description": "Infrastructure ships in no package: its dependencies release nothing, whatever their dependency type",
+      "matchFileNames": ["{{infra-dir}}/**"],
+      "semanticCommitType": "build"
+    }
+  ]
+}

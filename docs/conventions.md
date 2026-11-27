@@ -28,8 +28,8 @@ plugins/<plugin>/
   skills, agents, hooks and MCP servers. Add to an existing plugin before
   creating a new one.
 - **Name**: lowercase letters, digits and hyphens, matching the folder name
-  **(lint)**. Keep it short: it prefixes every skill (`/dotnet:repo-init`) and
-  every packaged skill name (`dotnet-repo-init`).
+  **(lint)**. Keep it short: it prefixes every skill (`/repo:init`) and
+  every packaged skill name (`repo-init`).
 - **plugin.json**: `name`, `version`, `description` are required **(lint)**;
   also set `author`, `homepage`, `repository`, `license`, `keywords`.
 - **Version**: owned by release-please, which bumps `plugin.json`. Never edit it
