@@ -1,30 +1,42 @@
-name: CI
+name: ci
 
+# Every job runs on every pull request and every push to main. `gate` fails
+# unless every other job succeeded: the rulesets on main require `gate` (plus
+# the jobs of lint.yml), so adding a job never means editing a ruleset.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
+  workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
     name: Validate plugins
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=npm depName=@anthropic-ai/claude-code
+      CLAUDE_CODE_VERSION: 2.1.332
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Node.js only runs the Claude Code CLI; the repository has no Node project.
       - uses: actions/setup-node@v7
         with:
           node-version: 26
       - name: Install Claude Code
-        run: npm install --global @anthropic-ai/claude-code
+        run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
       - name: Validate the marketplace, plugins and examples
         run: |
           claude plugin validate . --strict
@@ -35,11 +47,16 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements-dev.txt
       - name: Repository conventions
@@ -56,6 +73,9 @@ jobs:
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -63,10 +83,12 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           # The Claude API code execution container runs Python 3.11.
-          python-version: "3.11"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
@@ -74,11 +96,16 @@ jobs:
   package:
     name: Package skills
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
+          python-version-file: .python-version
           cache: pip
       - run: pip install -r requirements-dev.txt
       - run: python scripts/package_skills.py --include-examples --out dist
@@ -87,3 +114,18 @@ jobs:
           name: skills
           path: dist/
           retention-days: 7
+
+  gate:
+    name: gate
+    if: always()
+    needs: [validate, lint, test, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e 'length > 0 and all(.[]; . == "success")' > /dev/null

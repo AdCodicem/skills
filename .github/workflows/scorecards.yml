@@ -1,18 +1,23 @@
-name: Scorecard
+name: scorecard
 
+# OpenSSF Scorecard (public repositories): results in the Security tab, and
+# the README badge through publish_results.
 on:
-  branch_protection_rule:
-  schedule:
-    - cron: "33 5 * * 1"
   push:
     branches: [main]
+  schedule:
+    - cron: "24 3 * * 2"
+  branch_protection_rule:
+  workflow_dispatch:
 
+# The action reads many APIs; its documentation asks for read-all here and
+# grants writes per job.
 permissions: read-all
 
 jobs:
   analysis:
-    name: Scorecard analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       security-events: write
       id-token: write
@@ -20,16 +25,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: ossf/scorecard-action@v2.6.0
+
+      - uses: ossf/scorecard-action@v2
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
-      - uses: actions/upload-artifact@v7
-        with:
-          name: scorecard-sarif
-          path: results.sarif
-          retention-days: 5
+
       - uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif

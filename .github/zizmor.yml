@@ -1,0 +1,7 @@
+# zizmor configuration (lint.yml runs zizmor on every pull request).
+rules:
+  # zizmor recommends GitHub's `$/` self-repository syntax (2026-07-30) over
+  # `./.github/workflows/...`, but actionlint 1.7.12 rejects it. Re-enable this
+  # audit, and switch to `$/`, once actionlint accepts it.
+  self-repository:
+    disable: true
