@@ -26,8 +26,8 @@ packaged for claude.ai and the Claude API.
   that holds a credential installs or builds anything.
 - **Workflows**: `permissions: {}` at the top with per-job grants, actions
   pinned by full SHA with a `# vX.Y.Z` comment, no `pull_request_target`.
-  After any `uses:` change run `gh actions-lock` and commit
-  `.github/workflows/actions.lock`, or `lint.yml` fails. New CI jobs go into
+  Renovate updates the pins; no workflow lockfile (gh-actions-lock rewrites
+  SHA pins to tags, see ADR 6). New CI jobs go into
   `gate.needs` in `ci.yml`; the rulesets require `gate`, `pr-title`,
   `workflows` and `pre-commit`, so renaming those jobs means updating them.
 - **Renovate owns dependency updates** (`renovate.json`, preset

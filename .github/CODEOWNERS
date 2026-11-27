@@ -1,6 +1,5 @@
 # Code owners review the paths they own. Later lines win.
 * @AdCodicem
 
-# Workflows and their lockfile always need a code owner.
+# Workflows always need a code owner.
 /.github/ @AdCodicem
-/.github/workflows/actions.lock @AdCodicem

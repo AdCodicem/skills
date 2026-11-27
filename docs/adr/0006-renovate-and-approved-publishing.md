@@ -1,4 +1,4 @@
-# 6. Renovate for updates, an approved environment for publishing
+# 6. Renovate for updates, SHA pins, an approved environment for publishing
 
 Date: 2026-11-27
 
@@ -31,6 +31,11 @@ plugin whenever any plugin changes (ADR 3).
   opens every dependency update, GitHub Actions included, and merges
   non-majors itself after a three-day release age. Dependabot keeps the alerts
   only.
+- **Actions are pinned by full commit SHA** with a `# vX.Y.Z` comment, which
+  Renovate updates, and the "require SHA pinning" setting is on. No workflow
+  lockfile: gh-actions-lock 0.5.1 rewrites SHA pins back to tags and keys its
+  lockfile by tag, so the two cannot be combined, and Renovate's lockfile
+  support is experimental.
 - **release-please stays** (ADR 3), with a release GitHub App token, kept in
   the `release-please` environment, instead of `RELEASE_PLEASE_TOKEN`.
 - **Merging a release PR tags and drafts, and publishes nothing.** A
@@ -46,6 +51,9 @@ plugin whenever any plugin changes (ADR 3).
 - Each release waits for an approval click in the Actions tab.
 - Released zips carry a build provenance attestation
   (`gh attestation verify`).
+- Actions called inside composite actions stay unpinned, which a lockfile
+  would cover. Revisit when Renovate's lockfile support is stable and
+  Scorecard reads lockfiles.
 - `upload_skills.py` stays standard-library only, so the credentialed job
   installs no third-party package.
 
@@ -56,3 +64,7 @@ plugin whenever any plugin changes (ADR 3).
 - The Mend-hosted Renovate app: write access to every repository held by a
   third party, and one job every four hours.
 - semantic-release with one repository version: see ADR 3.
+- Full semver tags with the workflow lockfile and the "Require lockfile"
+  policy: locks transitive actions and detects impostor commits, but drops
+  the SHA-pinning setting and Scorecard's Pinned-Dependencies score, and
+  depends on experimental Renovate support.
