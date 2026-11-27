@@ -13,9 +13,15 @@ There is nothing to run by hand.
    `plugins/<plugin>/CHANGELOG.md`.
 3. Merging a release PR tags `<plugin>-v<version>` (for example `dotnet-v1.1.0`)
    and creates the GitHub release as a draft.
-4. The same workflow then:
-   - packages the plugin's portable skills and attaches `<plugin>-<skill>.zip`
-     files to the release, for claude.ai uploads;
+4. The `pack` job packages the plugin's portable skills into
+   `<plugin>-<skill>.zip` files, for claude.ai uploads, and records their
+   SHA-256 digests. It holds no credential.
+5. The `publish` job runs in the `release` environment and waits for the
+   maintainer's approval (**Actions** > the run > **Review deployments**).
+   Once approved, it:
+   - checks the digests recorded by `pack`;
+   - attests the zips (signed build provenance, `actions/attest`) and attaches
+     them, with the attestation bundle, to the draft;
    - publishes the release. The repository has immutable releases enabled, so
      files cannot be attached once a release is published: that is why
      release-please creates drafts (`draft` and `force-tag-creation` in
@@ -23,8 +29,8 @@ There is nothing to run by hand.
      draft; fix the cause and re-run the failed job;
    - uploads skills that target `api` to the Claude API (`/v1/skills`): a new
      version when a custom skill with the same name exists, a new skill
-     otherwise. Skipped when the `ANTHROPIC_API_KEY` secret is not set.
-     Uploading runs no model and consumes no tokens.
+     otherwise. Skipped when the `ANTHROPIC_API_KEY` environment secret is not
+     set. Uploading runs no model and consumes no tokens.
 
 Claude Code users get the new version when their marketplace refreshes: the
 version in `plugin.json` is what Claude Code compares.
@@ -46,23 +52,31 @@ remove it after the release.
 
 ## One-time GitHub setup
 
-These settings cannot be committed. Apply them once in the repository settings:
+These settings cannot be committed:
 
-- **General > Pull Requests**: allow squash merging only, with "Pull request
-  title" as the default commit message; allow auto-merge; automatically delete
-  head branches.
-- **Rules > Rulesets** (or branch protection) on `main`: require a pull request
-  and these status checks: `Validate plugins`, `Lint`, `Test (ubuntu-latest)`,
-  `Test (windows-latest)`, `Package skills`, `Conventional Commit title`.
-- **Actions > General**: allow GitHub Actions to create and approve pull
-  requests (release-please opens PRs).
-- **General > Releases**: immutable releases can stay enabled; the Release
-  workflow publishes each release only after attaching its files.
-- **Secrets > Actions** (optional):
-  - `RELEASE_PLEASE_TOKEN`: a fine-grained token with contents and pull
-    requests write access. Without it, release PRs are opened with
-    `GITHUB_TOKEN` and GitHub does not run CI on them, so required checks never
-    report: merge them as an administrator or add the token.
-  - `ANTHROPIC_API_KEY`: enables the automatic upload of `api` skills.
-- **Security**: enable private vulnerability reporting, Dependabot alerts and
-  Dependabot security updates.
+- **General > Pull Requests**: squash merging only, with the pull request
+  title as the commit; auto-merge allowed; head branches deleted after merge.
+- **Rules > Rulesets**: `main` (everyone: no deletion, no force push, linear
+  history, pull requests only, squash only, required checks `gate`,
+  `pr-title`, `workflows`, `pre-commit`) and `main-human-gates` (the same
+  checks plus `CodeQL`, with the branch up to date; the Renovate App and the
+  release App are exempt).
+- **Security**: private vulnerability reporting, secret scanning and push
+  protection, Dependabot alerts on (Dependabot updates off: Renovate opens
+  update PRs); CodeQL default setup off (`codeql.yml` is the advanced setup).
+- **Actions > General**: workflow token read-only by default; actions must be
+  pinned to a full-length commit SHA.
+
+And what only the maintainer can create:
+
+- **Release GitHub App** (once per account): permissions Contents, Pull
+  requests and Issues read and write, no webhook, installed on this
+  repository. Put its client ID in the `RELEASE_APP_CLIENT_ID` variable and its
+  private key in the `RELEASE_APP_PRIVATE_KEY` secret of the
+  `release-please` environment (deployment branch `main`, no reviewer). Its
+  token makes GitHub run CI on release PRs, which `GITHUB_TOKEN` cannot.
+- **`release` environment**: required reviewer the maintainer, deployment
+  branch `main`, secret `ANTHROPIC_API_KEY` (optional: enables the automatic
+  upload of `api` skills).
+- **Immutable releases** stay enabled; the workflow publishes each release
+  only after attaching its files.
