@@ -1,6 +1,6 @@
 {
   "name": "dotnet",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Skills for .NET development: write, review, modernize and upgrade C# and .NET code with C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK).",
   "author": {
     "name": "AdCodicem",
