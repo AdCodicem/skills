@@ -10,5 +10,13 @@
   "homepage": "https://github.com/AdCodicem/skills/tree/main/plugins/repo",
   "repository": "https://github.com/AdCodicem/skills",
   "license": "MIT",
-  "keywords": ["git", "github", "scaffolding", "ci-cd", "release", "security", "iac"]
+  "keywords": [
+    "git",
+    "github",
+    "scaffolding",
+    "ci-cd",
+    "release",
+    "security",
+    "iac"
+  ]
 }
