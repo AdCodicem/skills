@@ -1,0 +1,44 @@
+name: Bug report
+description: A plugin, skill, agent or hook does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. Search the open issues first; a security problem goes to the Security tab instead.
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and version
+      description: For example `dotnet 1.0.1`, from `/plugin` or the plugin's `CHANGELOG.md`.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Claude Code
+        - claude.ai
+        - Claude API
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you asked, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: The prompt, command or repository that shows the problem.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Claude Code version, operating system, and anything else relevant.
