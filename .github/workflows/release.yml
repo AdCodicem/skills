@@ -42,14 +42,14 @@ jobs:
       # An App token, unlike GITHUB_TOKEN, triggers CI on the release PRs it opens.
       - name: Release token
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
-      - uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
@@ -72,12 +72,12 @@ jobs:
       PLUGIN_PATH: ${{ matrix.path }}
       TAG: ${{ fromJSON(needs.release-please.outputs.all)[format('{0}--tag_name', matrix.path)] }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
           persist-credentials: false
       # No cache: a poisoned cache must never reach a release.
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
       - run: pip install -r requirements-dev.txt
@@ -89,7 +89,7 @@ jobs:
       - id: artifact
         name: Artifact name
         run: echo "name=release-$(basename "$PLUGIN_PATH")" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: dist/
@@ -119,14 +119,14 @@ jobs:
     steps:
       # The checkout only provides scripts/upload_skills.py (standard library
       # only); nothing is installed or built in this job.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
           persist-credentials: false
       - id: artifact
         name: Artifact name
         run: echo "name=release-$(basename "$PLUGIN_PATH")" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: dist
@@ -145,7 +145,7 @@ jobs:
       - name: Attest the zips
         id: attest
         if: steps.zips.outputs.found == 'true' && !github.event.repository.private
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*.zip
       - name: Attach the zips and the attestation bundle to the draft
