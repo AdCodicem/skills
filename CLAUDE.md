@@ -21,11 +21,28 @@ packaged for claude.ai and the Claude API.
   PR title is the commit.
 - Add a plugin with `python scripts/new_plugin.py` and a skill with
   `python scripts/new_skill.py`, so registration stays consistent.
+- **Merging a release PR publishes nothing on its own**: the `publish` job of
+  `release.yml` waits for approval in the `release` environment, and no job
+  that holds a credential installs or builds anything.
+- **Workflows**: `permissions: {}` at the top with per-job grants, actions
+  pinned by full SHA with a `# vX.Y.Z` comment, no `pull_request_target`.
+  After any `uses:` change run `gh actions-lock` and commit
+  `.github/workflows/actions.lock`, or `lint.yml` fails. New CI jobs go into
+  `gate.needs` in `ci.yml`; the rulesets require `gate`, `pr-title`,
+  `workflows` and `pre-commit`, so renaming those jobs means updating them.
+- **Renovate owns dependency updates** (`renovate.json`, preset
+  `AdCodicem/renovate-config`); Dependabot keeps the alerts only. Python
+  stays on 3.11 (`.python-version`): skill scripts must run on the Claude API
+  container.
+- Files under `templates/` and `plugins/*/skills/*/templates/` are data that
+  skills copy: Renovate, the pre-commit syntax hooks and the version scripts
+  leave them alone, and so should repository-wide edits.
 
 ## Commands
 
 ```bash
 pip install -r requirements-dev.txt
+pre-commit install                            # once per clone; CI runs every hook
 python scripts/check.py                       # all checks, as in CI
 python scripts/lint_skills.py                 # conventions only
 python -m pytest -q                           # tests
