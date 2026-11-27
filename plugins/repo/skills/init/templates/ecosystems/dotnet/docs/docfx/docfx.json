@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../../src",
+          "files": [
+            "**/*.csproj"
+          ]
+        }
+      ],
+      "dest": "../website/docs/reference/api",
+      "outputFormat": "markdown",
+      "properties": {
+        "TargetFramework": "{{target-framework}}",
+        "Configuration": "Release"
+      },
+      "memberLayout": "samePage",
+      "enumSortOrder": "declaringOrder"
+    }
+  ]
+}

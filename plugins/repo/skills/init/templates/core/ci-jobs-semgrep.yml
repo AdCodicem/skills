@@ -1,0 +1,34 @@
+# Private repositories without GitHub Code Security (references/areas/security.md):
+# CodeQL's license forbids running it on that code, so Semgrep Community
+# Edition scans every pull request inside ci.yml. Paste the job under `jobs:`
+# and add `semgrep` to `gate.needs`. It needs no secret, so the bots' pull
+# requests run it too.
+jobs:
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # renovate: datasource=pypi depName=semgrep
+      SEMGREP_VERSION: 1.187.0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # --baseline-commit needs the base commit
+          persist-credentials: false
+
+      # Fails on findings of ERROR or WARNING severity (ERROR alone keeps almost
+      # no rule); on a pull request, only on the findings it adds. The rules come from the Semgrep Registry at run time:
+      # their license allows running them on your own code, never copying
+      # them into the repository.
+      - name: Scan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          args=(--config p/default --severity ERROR --severity WARNING --error --metrics off --disable-version-check)
+          if [ -n "$BASE_SHA" ]; then
+            args+=(--baseline-commit "$BASE_SHA")
+          fi
+          pipx run --spec "semgrep==${SEMGREP_VERSION}" semgrep scan "${args[@]}"

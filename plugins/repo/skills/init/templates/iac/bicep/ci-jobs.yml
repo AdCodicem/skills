@@ -1,0 +1,93 @@
+# Bicep jobs for ci.yml (references/iac/bicep.md). Paste both jobs under `jobs:`,
+# above `gate`, and add `bicep-lint` and `bicep-what-if` to `gate.needs`.
+# {{infra-dir}} is `infra` in an application repository, `.` in an operations repository.
+jobs:
+  bicep-lint:
+    name: bicep lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: "{{infra-dir}}"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The Azure CLI is preinstalled on GitHub-hosted Ubuntu runners; this installs
+      # the Bicep CLI it drives, at its latest release.
+      - name: Install Bicep
+        run: az bicep install
+
+      # Rules set to `error` in bicepconfig.json fail these commands.
+      - name: Lint and build
+        run: |
+          az bicep lint --file main.bicep
+          az bicep build --file main.bicep --stdout > /dev/null
+          for params in main.*.bicepparam; do
+            az bicep build-params --file "$params" --stdout > /dev/null
+          done
+
+      - name: Check formatting
+        run: |
+          az bicep format --file main.bicep
+          git diff --exit-code -- .
+
+  # Runs on every event so that `gate` sees a success, but only a pull request
+  # from a branch of this repository gets an OIDC token: on a fork's pull request
+  # or a push, the steps below are skipped. The plan identity is read-only.
+  bicep-what-if:
+    name: bicep what-if
+    needs: bicep-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: "{{infra-dir}}"
+    env:
+      SAME_REPO_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Say why nothing runs
+        if: env.SAME_REPO_PR != 'true'
+        run: echo "what-if runs only on pull requests from branches of this repository."
+
+      - uses: actions/checkout@v7
+        if: env.SAME_REPO_PR == 'true'
+        with:
+          persist-credentials: false
+
+      - uses: azure/login@v3
+        if: env.SAME_REPO_PR == 'true'
+        with:
+          client-id: ${{ vars.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # The result goes to the job summary only, never to a pull request comment:
+      # on a public repository anyone could read the plan of production.
+      # ProviderNoRbac lets a Reader identity run what-if.
+      - name: What-if against every environment
+        if: env.SAME_REPO_PR == 'true'
+        env:
+          AZURE_CORE_NO_COLOR: "true"
+          RG_STAGING: ${{ vars.AZURE_RESOURCE_GROUP_STAGING }}
+          RG_PRODUCTION: ${{ vars.AZURE_RESOURCE_GROUP_PRODUCTION }}
+        run: |
+          for environment in staging production; do
+            if [ "$environment" = staging ]; then group="$RG_STAGING"; else group="$RG_PRODUCTION"; fi
+            {
+              echo "### What-if: $environment"
+              echo '```text'
+              az deployment group what-if \
+                --resource-group "$group" \
+                --template-file main.bicep \
+                --parameters "main.$environment.bicepparam" \
+                --validation-level ProviderNoRbac
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done

@@ -1,0 +1,7 @@
+# Node.js (append to .gitignore)
+node_modules/
+lib/
+coverage/
+.vitest/
+*.tgz
+.eslintcache

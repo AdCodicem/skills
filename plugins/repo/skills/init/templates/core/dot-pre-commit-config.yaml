@@ -1,0 +1,29 @@
+# https://pre-commit.com (or https://github.com/j178/prek, a compatible drop-in).
+# Run once: `pre-commit install`. CI runs every hook on every file (lint.yml).
+# scripts/latest_versions.py --write moves each `rev` to its latest release.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-illegal-windows-names
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: check-json
+        exclude: '(^|/)(tsconfig[^/]*|\.vscode/[^/]*)\.json$'  # JSON with comments
+      - id: check-toml
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=no]
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  # Ecosystem modules add their hooks below (formatters, linters).

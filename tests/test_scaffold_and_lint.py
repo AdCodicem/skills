@@ -26,6 +26,7 @@ def test_scaffolded_plugin_and_skill_are_lint_clean(repo):
     assert config["packages"]["plugins/demo"]["initial-version"] == "0.1.0"
     manifest = json.loads((repo / "plugins/demo/.claude-plugin/plugin.json").read_text())
     assert manifest["keywords"] == ["demo"]
+    assert "$schema" not in manifest
     skill_md = (repo / "plugins/demo/skills/do-things/SKILL.md").read_text()
     assert "surfaces: claude-code, api" in skill_md
 
@@ -137,3 +138,11 @@ def test_real_repository_is_lint_clean():
     from helpers import REPO_ROOT
 
     assert errors(REPO_ROOT) == []
+
+
+def test_schema_key_in_plugin_manifest_is_an_error(repo):
+    create_plugin(repo, "demo", "Demo plugin.", "development", ["demo"])
+    path = repo / "plugins/demo/.claude-plugin/plugin.json"
+    manifest = json.loads(path.read_text())
+    path.write_text(json.dumps({"$schema": "https://example.com/schema.json", **manifest}))
+    assert any("'$schema' is not a plugin.json field" in e for e in errors(repo))

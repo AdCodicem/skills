@@ -1,0 +1,11 @@
+# Fragment: append to the repository's .gitattributes, after `* text=auto eol=lf`.
+
+# Visual Studio rewrites a .sln with CRLF line endings: keep them, or every save
+# shows a whole-file diff. (.slnx is XML and keeps LF.)
+*.sln text eol=crlf
+
+# Binary artifacts that may be committed as test data
+*.dll binary
+*.exe binary
+*.nupkg binary
+*.snupkg binary

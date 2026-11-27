@@ -1,0 +1,29 @@
+{
+  "description": "Fragment: merge these packageRules into renovate.json, after the rules the shared preset adds. Rules apply in order; a later match wins.",
+  "packageRules": [
+    {
+      "description": "NuGet packages, the .NET SDK in global.json and the local tools are build tooling: build(deps), which releases nothing.",
+      "matchManagers": ["nuget"],
+      "semanticCommitType": "build"
+    },
+    {
+      "description": "Packages that ship as dependencies of this repository's NuGet packages (the <dependency> elements of the packed .nuspec files): fix(deps), so an update releases a patch.",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["{{shipped-package}}"],
+      "semanticCommitType": "fix"
+    },
+    {
+      "description": "A new major of the .NET SDK goes with a framework upgrade: never merged unattended.",
+      "matchManagers": ["nuget"],
+      "matchDepTypes": ["dotnet-sdk"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Microsoft.Testing.Platform and its extensions must stay on one release line (MTP 2.4+ constrains extensions to the platform's major).",
+      "matchManagers": ["nuget"],
+      "matchPackageNames": ["/^Microsoft\\.Testing\\./"],
+      "groupName": "Microsoft.Testing.Platform"
+    }
+  ]
+}

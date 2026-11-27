@@ -1,0 +1,16 @@
+{
+  "packageRules": [
+    {
+      "description": "Extras ship with the package like its dependencies: fix(deps), so an update releases a patch.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "project.optional-dependencies"],
+      "semanticCommitType": "fix"
+    },
+    {
+      "description": "Raising requires-python drops users: a decision for a person, never a bot.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["requires-python"],
+      "enabled": false
+    }
+  ]
+}

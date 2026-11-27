@@ -1,0 +1,98 @@
+# Fragment: paste these jobs under `jobs:` in ci.yml, above `gate`, and add every job id
+# (python-lint, python-typecheck, python-test, python-build) to gate.needs.
+# A project in a subfolder: add `defaults: { run: { working-directory: <folder> } }` to each job
+# and `working-directory: <folder>` to setup-uv.
+jobs:
+  python-lint:
+    name: python lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked
+      - name: Format
+        run: uv run --no-sync ruff format --check
+      - name: Lint
+        run: uv run --no-sync ruff check --output-format=github
+
+  python-typecheck:
+    name: python typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked
+      - name: Type check
+        run: uv run --no-sync mypy
+
+  python-test:
+    name: python test (${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # tokenless Codecov upload; drop with the Codecov step
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every CPython version from requires-python to the latest stable, from
+        # https://peps.python.org/api/release-cycle.json (status bugfix or security).
+        # An application tests the version of .python-version only.
+        python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: uv sync --locked
+      - name: Test
+        run: uv run --no-sync pytest --cov --cov-report=xml --cov-report=term
+      # Public profiles at the standard tier and up; delete for the others.
+      - name: Upload coverage
+        if: matrix.python == '{{python-latest}}'
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: coverage.xml
+          fail_ci_if_error: true
+
+  python-build:
+    name: python build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.4.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked
+      - name: Build
+        run: uv build --no-sources --out-dir dist
+      # Checks the metadata and that the README renders on PyPI.
+      - name: Check the distributions
+        run: uv run --no-sync twine check --strict dist/*

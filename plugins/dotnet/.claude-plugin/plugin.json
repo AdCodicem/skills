@@ -1,8 +1,7 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "dotnet",
-  "version": "1.0.1",
-  "description": "Skills for .NET development: write, review, modernize and upgrade C# and .NET code with C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK), and scaffold personal open-source .NET repositories to a standard toolchain.",
+  "version": "2.1.0",
+  "description": "Skills for .NET development: write, review, modernize and upgrade C# and .NET code with C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK).",
   "author": {
     "name": "AdCodicem",
     "url": "https://github.com/AdCodicem"
@@ -16,8 +15,6 @@
     "aspnetcore",
     "efcore",
     "modernization",
-    "migration",
-    "scaffolding",
-    "ci-cd"
+    "migration"
   ]
 }

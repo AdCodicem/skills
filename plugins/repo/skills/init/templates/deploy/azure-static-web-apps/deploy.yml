@@ -1,0 +1,126 @@
+name: deploy
+
+# Azure Static Web Apps target: builds the static site at a commit or tag and
+# uploads it. `staging` goes to a named preview environment of the same static
+# web app, `production` to its production environment. No deployment token is
+# stored: the job signs in to Azure with OIDC and reads the token at run time.
+# Copy to .github/workflows/deploy.yml.
+#
+# Variables of each GitHub environment (identifiers, not secrets):
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+#   AZURE_RESOURCE_GROUP, AZURE_STATIC_WEB_APP
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: staging or production.
+        type: string
+        required: true
+      ref:
+        description: Commit or tag to build.
+        type: string
+        required: true
+      version:
+        description: Version label shown in the build (VITE_APP_VERSION).
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        default: production
+      ref:
+        description: Tag or commit to deploy; an older tag rolls back.
+        type: string
+        required: true
+      version:
+        description: Version label, for example 1.4.2.
+        type: string
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # The React module's build (references/ecosystems/react.md). It must
+      # leave the static site, with staticwebapp.config.json, in dist/.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        env:
+          VITE_APP_VERSION: ${{ inputs.version }}
+        run: pnpm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: site
+          path: dist
+          if-no-files-found: error
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deploy.outputs.static_web_app_url }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: site
+          path: dist
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read the deployment token
+        id: token
+        env:
+          APP: ${{ vars.AZURE_STATIC_WEB_APP }}
+          GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+        run: |
+          token=$(az staticwebapp secrets list --name "$APP" --resource-group "$GROUP" --query properties.apiKey --output tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      # Named environment for staging; empty means the production environment.
+      - id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.token }}
+          action: upload
+          app_location: dist
+          output_location: ""
+          skip_app_build: true
+          skip_api_build: true
+          deployment_environment: ${{ inputs.environment != 'production' && 'staging' || '' }}
+
+      - name: Smoke check
+        env:
+          URL: ${{ steps.deploy.outputs.static_web_app_url }}
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors --output /dev/null "$URL"

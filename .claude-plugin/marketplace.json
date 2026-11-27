@@ -10,9 +10,30 @@
     {
       "name": "dotnet",
       "source": "./plugins/dotnet",
-      "description": "Skills for .NET development: modern C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK) for writing, reviewing, modernizing and upgrading code, plus repository scaffolding.",
+      "description": "Skills for .NET development: modern C# 14/15 and .NET 10/11 (runtime, ASP.NET Core, EF Core, SDK) for writing, reviewing, modernizing and upgrading code.",
       "category": "development",
-      "tags": ["dotnet", "csharp", "aspnetcore", "efcore", "modernization", "scaffolding", "ci-cd"]
+      "tags": [
+        "dotnet",
+        "csharp",
+        "aspnetcore",
+        "efcore",
+        "modernization"
+      ]
+    },
+    {
+      "name": "repo",
+      "source": "./plugins/repo",
+      "description": "Scaffold or audit a GitHub repository to a current, secure standard: a language-agnostic core with .NET, Node, React, Python, Bicep, Pulumi and Cloudflare modules, adapted to the project, its profile and its GitHub plan.",
+      "category": "development",
+      "tags": [
+        "git",
+        "github",
+        "scaffolding",
+        "ci-cd",
+        "release",
+        "security",
+        "iac"
+      ]
     }
   ]
 }

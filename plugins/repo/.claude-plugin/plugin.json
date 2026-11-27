@@ -1,0 +1,21 @@
+{
+  "name": "repo",
+  "version": "0.2.0",
+  "description": "Scaffold or audit a GitHub repository to a current, secure standard: a language-agnostic core with .NET, Node, React, Python, Bicep, Pulumi and Cloudflare modules, adapted to the project, its profile and its GitHub plan.",
+  "author": {
+    "name": "AdCodicem",
+    "url": "https://github.com/AdCodicem"
+  },
+  "homepage": "https://github.com/AdCodicem/skills/tree/main/plugins/repo",
+  "repository": "https://github.com/AdCodicem/skills",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "github",
+    "scaffolding",
+    "ci-cd",
+    "release",
+    "security",
+    "iac"
+  ]
+}

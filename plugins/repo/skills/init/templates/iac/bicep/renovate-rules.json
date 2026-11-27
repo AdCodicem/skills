@@ -1,0 +1,30 @@
+{
+  "//": "Merge into renovate.json (references/iac/bicep.md). Resource API versions are updated by Renovate's bicep manager natively; Azure Verified Modules need this custom manager, which reads tags from the public registry (MCR) through the docker datasource. Best effort: verified against MCR's tag listing, not yet in a full Renovate run.",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Azure Verified Modules in the public Bicep registry",
+      "managerFilePatterns": ["/\\.bicep$/"],
+      "matchStrings": ["'br/public:(?<depName>avm/[^:']+):(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)'"],
+      "datasourceTemplate": "docker",
+      "registryUrlTemplate": "https://mcr.microsoft.com",
+      "packageNameTemplate": "bicep/{{{depName}}}",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Infrastructure ships in no package: Bicep updates release nothing",
+      "matchManagers": ["bicep", "custom.regex"],
+      "matchDepNames": ["/^avm\\//", "/^Microsoft\\./"],
+      "semanticCommitType": "build"
+    },
+    {
+      "description": "AVM modules are 0.x: a minor may break, so minors wait for a person",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["/^avm\\//"],
+      "matchUpdateTypes": ["minor"],
+      "automerge": false
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+name: ci
+
+# Every job runs on every pull request and every push to main. `gate` fails
+# unless every other job succeeded: the ruleset on main requires `gate` alone
+# (plus the jobs of lint.yml), so adding a job never means editing the ruleset.
+# release.yml and preview.yml call this workflow before publishing anything.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Paste the jobs of each module's ci-jobs.yml here, then list them in
+  # gate.needs. Job ids are prefixed by module: dotnet-build, node-test, ...
+
+  gate:
+    name: gate
+    if: always()
+    needs: []
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          echo "$RESULTS" | jq -e 'length > 0 and all(.[]; . == "success")' > /dev/null

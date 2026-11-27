@@ -1,0 +1,46 @@
+name: benchmarks
+
+# Manual only (complete tier). BenchmarkDotNet needs a quiet machine to produce
+# numbers worth comparing; a shared runner is noisy and a full run is slow, so
+# benchmarks never run on pull requests. Dispatch it before a release or when
+# investigating a performance change, and compare runs of the same workflow
+# only: absolute timings differ from one runner to the next.
+on:
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: BenchmarkDotNet filter (for example '*Serialization*')
+        required: false
+        default: "*"
+
+permissions: {}
+
+jobs:
+  run:
+    name: run benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Run benchmarks
+        env:
+          FILTER: ${{ inputs.filter }}
+        run: >-
+          dotnet run --configuration Release
+          --project benchmarks/{{project}}.Benchmarks
+          -- --filter "$FILTER"
+
+      - name: Upload results
+        uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: BenchmarkDotNet.Artifacts/results/

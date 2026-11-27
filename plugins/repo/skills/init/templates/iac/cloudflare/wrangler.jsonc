@@ -1,0 +1,28 @@
+// Cloudflare Worker of {{project}}, deployed by Wrangler (references/iac/cloudflare.md).
+// Static sites use Workers static assets; keep `main` only when there is code to run.
+// Environments: `wrangler deploy --env staging` and `--env production`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{project}}",
+  "main": "src/index.ts",
+  // Set to the date of the setup, then moved forward deliberately: it selects the
+  // runtime's behavior, so a change is tested in staging first.
+  "compatibility_date": "{{today}}",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "env": {
+    "staging": {
+      "name": "{{project}}-staging"
+    },
+    "production": {
+      "name": "{{project}}"
+      // "routes": [{ "pattern": "{{domain}}", "custom_domain": true }]
+    }
+  }
+}

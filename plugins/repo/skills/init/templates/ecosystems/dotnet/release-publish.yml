@@ -1,0 +1,58 @@
+# Fragment: steps for the `publish` job of release.yml (environment `release`)
+# and preview.yml (environment `preview`), after the core has checked the
+# digests of dist/ and attested its files. Builds nothing.
+#
+# nuget.org re-signs every .nupkg it receives, which changes its digest: the
+# attestation of the .nupkg then matches the file attached to the GitHub release
+# but not the one restored from nuget.org. The assemblies inside are left as
+# packed, so they are attested too, and a consumer verifies a restored package
+# through one of them:
+#   gh attestation verify ~/.nuget/packages/<id>/<version>/lib/<tfm>/<id>.dll --repo {{owner}}/{{repo}}
+#
+# Job permissions required (set by the core): id-token: write (NuGet login and
+# attestations), attestations: write, contents: read.
+steps:
+  - uses: actions/setup-dotnet@v6
+    with:
+      global-json-file: global.json
+
+  # Libraries keep their assemblies under lib/, .NET tools under tools/.
+  - name: Extract the assemblies of the packages
+    id: assemblies
+    run: |
+      mkdir -p "$RUNNER_TEMP/packages" "$RUNNER_TEMP/assemblies"
+      for package in dist/nuget/*.nupkg; do
+        unzip -q -o "$package" -d "$RUNNER_TEMP/packages/$(basename "$package" .nupkg)"
+      done
+      cd "$RUNNER_TEMP/packages"
+      find . \( -path '*/lib/*.dll' -o -path '*/tools/*.dll' \) -exec cp --parents {} "$RUNNER_TEMP/assemblies" \;
+      count="$(find "$RUNNER_TEMP/assemblies" -name '*.dll' | wc -l)"
+      echo "Assemblies to attest: $count"
+      echo "count=$count" >> "$GITHUB_OUTPUT"
+
+  # Attestations need a public repository or GitHub Enterprise Cloud.
+  - name: Attest the assemblies
+    if: ${{ !github.event.repository.private && steps.assemblies.outputs.count != '0' }}
+    uses: actions/attest@v4
+    with:
+      subject-path: ${{ runner.temp }}/assemblies/**/*.dll
+
+  # Trusted publishing: exchanges this run's OIDC token for an API key valid
+  # one hour. The nuget.org policy names this repository, the workflow file and
+  # the environment.
+  - name: NuGet login
+    id: nuget-login
+    uses: NuGet/login@v1
+    with:
+      user: "{{nuget-user}}"
+
+  # Pushes each .snupkg with its .nupkg. --skip-duplicate makes a rerun after a
+  # partial failure push only what is missing.
+  - name: Push to nuget.org
+    env:
+      NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+    run: >-
+      dotnet nuget push "dist/nuget/*.nupkg"
+      --api-key "$NUGET_API_KEY"
+      --source https://api.nuget.org/v3/index.json
+      --skip-duplicate

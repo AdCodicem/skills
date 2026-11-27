@@ -1,0 +1,48 @@
+# Fragment: jobs to add to release.yml when the repository deploys an
+# application. Paste them under `jobs:` and wire `needs` as below:
+#
+#   plan -> verify -> pack -> [image] -> deploy-production -> publish
+#
+# - `publish` (semantic-release: tag, changelog, draft release, then the draft
+#   published) gets `needs: [plan, pack, deploy-production]`, so a GitHub release
+#   records what production runs, and a refused deployment leaves no tag behind.
+# - An application that publishes no package has no release-publish.yml
+#   fragment: its `publish` job only runs semantic-release and publishes the
+#   draft.
+# - The required reviewer sits on `production`, not on `release`, so a release
+#   asks for one approval, right before production changes. A repository that
+#   ships packages and a deployment keeps the reviewer on `release`, gives
+#   `production` none, and deploys after `publish` instead.
+# - Where the plan has no required reviewers (private repositories below
+#   Enterprise Cloud), the dispatch of release.yml is the approval.
+#
+# These jobs never run on a dry run.
+
+jobs:
+  # Container targets only. Reuses the sha-<commit> image staging already
+  # pushed, or builds it if that commit never went through staging. For static
+  # targets, delete this job and remove it from `deploy-production.needs`.
+  # `plan` outputs mirror next-version.mjs (release_type, next_version).
+  image:
+    needs: [plan, verify]
+    if: needs.plan.outputs.release_type != '' && !inputs.dry_run
+    uses: ./.github/workflows/container.yml
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    with:
+      ref: ${{ github.sha }}
+
+  deploy-production:
+    needs: [plan, pack, image]
+    if: needs.plan.outputs.release_type != '' && !inputs.dry_run
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      environment: production
+      ref: ${{ github.sha }}
+      version: ${{ needs.plan.outputs.next_version }}

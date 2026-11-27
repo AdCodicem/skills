@@ -1,0 +1,44 @@
+# Fragment: steps for the `publish` job of release.yml and preview.yml (environment
+# `release` or `preview`, `id-token: write`). Builds nothing: dist/npm comes from `pack`.
+#
+# Trusted publishing (OIDC): no token. npm generates the provenance attestation itself
+# for a public package published from a public repository. Needs npm 11.15.0 or later
+# (staged publishing; trusted publishing alone needs 11.5.1) and Node.js 22.14 or later.
+#
+# - A stable release is staged (`npm stage publish`): it goes live when a maintainer
+#   approves it with 2FA (npmjs.com, Staged Packages, or `npm stage approve <id>`).
+#   npm's default for trusted publisher configurations created since 2026-09-03.
+# - A preview (a version with a hyphen) is published directly under the `next`
+#   dist-tag, by a second trusted publisher configuration (preview.yml, environment
+#   `preview`) allowed to publish: weekly approvals would defeat unattended previews.
+# - Idempotent: a version already on the registry is skipped, so rerunning a failed
+#   job is safe.
+steps:
+  - uses: actions/setup-node@v7
+    with:
+      node-version: lts/*
+      registry-url: https://registry.npmjs.org
+      package-manager-cache: false
+
+  - name: Check the npm version
+    run: |
+      required=11.15.0
+      current="$(npm --version)"
+      if [ "$(printf '%s\n%s\n' "$required" "$current" | sort -V | head -n 1)" != "$required" ]; then
+        echo "::error::npm $current is older than $required, which staged and trusted publishing need."
+        exit 1
+      fi
+
+  - name: Publish to npm
+    run: |
+      for tarball in dist/npm/*.tgz; do
+        name="$(tar -xOzf "$tarball" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).name')"
+        if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+          echo "$name@$VERSION is already on the registry: skipped."
+          continue
+        fi
+        case "$VERSION" in
+          *-*) npm publish "$tarball" --tag next ;;
+          *)   npm stage publish "$tarball" ;;
+        esac
+      done
