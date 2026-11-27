@@ -21,13 +21,21 @@ results.json
 # Local Claude Code settings
 .claude/settings.local.json
 
-# Secrets
+# Environment and secrets: never committed
 .env
+.env.*
 *.env
+!.env.example
+*.pem
+*.key
 
 # Editors and OS
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 *.swp
+*~
 .DS_Store
 Thumbs.db
+desktop.ini
