@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/AdCodicem/skills/compare/dotnet-v2.0.0...dotnet-v2.1.0) (2026-11-27)
+
+
+### Features
+
+* **repo:** trigger /repo:init reliably, and drop $schema from plugin manifests ([#11](https://github.com/AdCodicem/skills/issues/11)) ([25c06ac](https://github.com/AdCodicem/skills/commit/25c06ac8e8927baf58a549dc6c8181ffdc101335))
+
 ## [2.0.0](https://github.com/AdCodicem/skills/compare/dotnet-v1.1.0...dotnet-v2.0.0) (2026-11-27)
 
 
