@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "hello-world",
   "version": "0.1.0",
   "description": "Reference plugin showing every convention of this repository: a portable skill with a Python script, a subagent, a hook, tests and evals.",

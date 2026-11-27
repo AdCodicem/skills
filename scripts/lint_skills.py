@@ -139,6 +139,11 @@ class Linter:
             self.error(plugin.manifest_path, "'version' must be a semantic version (x.y.z)")
         if not manifest.get("description"):
             self.error(plugin.manifest_path, "'description' is required")
+        if "$schema" in manifest:
+            self.error(
+                plugin.manifest_path,
+                "'$schema' is not a plugin.json field: the claude.ai plugin sync strips it",
+            )
         if not (plugin.path / "README.md").is_file():
             self.error(plugin.path, "README.md is required")
 

@@ -31,7 +31,8 @@ plugins/<plugin>/
   **(lint)**. Keep it short: it prefixes every skill (`/repo:init`) and
   every packaged skill name (`repo-init`).
 - **plugin.json**: `name`, `version`, `description` are required **(lint)**;
-  also set `author`, `homepage`, `repository`, `license`, `keywords`.
+  also set `author`, `homepage`, `repository`, `license`, `keywords`. No
+  `$schema` **(lint)**: the claude.ai plugin sync warns about it and strips it.
 - **Version**: owned by release-please, which bumps `plugin.json`. Never edit it
   by hand, and never set `version` in `marketplace.json` **(lint)**.
 - **Registration**: every folder in `plugins/` is listed in `marketplace.json`
