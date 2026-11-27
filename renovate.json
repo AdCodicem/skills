@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>AdCodicem/renovate-config"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    "**/vendor/**",
+    "**/examples/**",
+    "**/__tests__/**",
+    "**/test/**",
+    "**/tests/**",
+    "**/__fixtures__/**",
+    "templates/**",
+    "plugins/*/skills/*/templates/**",
+    "plugins/*/skills/*/assets/**"
+  ],
+  "packageRules": [
+    {
+      "description": "Python 3.11 is the Claude API code execution container's version: skill scripts must run on it (ADR 4).",
+      "matchManagers": [
+        "pyenv",
+        "pep621"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "The ruff pre-commit hook and the ruff of requirements-dev.txt move together, so the hook and CI agree.",
+      "matchPackageNames": [
+        "ruff",
+        "astral-sh/ruff-pre-commit"
+      ],
+      "groupName": "ruff"
+    }
+  ]
+}
