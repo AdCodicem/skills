@@ -78,9 +78,12 @@ A private repository from `templates/renovate/runner/`:
 ### 3. The Renovate GitHub App
 
 Created by the user (Settings, Developer settings, GitHub Apps): no webhook;
-repository permissions Contents, Pull requests, Issues, Workflows and Checks
-read and write, Dependabot alerts and Administration read, Metadata read;
-installable on this account only. Install it on every repository Renovate
+repository permissions Contents, Pull requests, Issues, Workflows, Checks and
+Commit statuses read and write, Dependabot alerts and Administration read,
+Metadata read; installable on this account only. Commit statuses carry
+Renovate's `renovate/stability-days` status, which holds a branch until the
+release age has passed
+([permissions](https://docs.renovatebot.com/modules/platform/github/#running-as-a-github-app)). Install it on every repository Renovate
 should manage. Pull requests opened with the App's token trigger CI, unlike
 those opened with `GITHUB_TOKEN`.
 
