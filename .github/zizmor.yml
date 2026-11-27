@@ -5,3 +5,10 @@ rules:
   # audit, and switch to `$/`, once actionlint accepts it.
   self-repository:
     disable: true
+  # ci.yml's `validate` job installs the Claude Code CLI with npm, outside a
+  # lockfile: the version is exact and tracked by Renovate, and the job holds
+  # no credential (contents: read, no secret). A package.json for one CLI
+  # would add a Node project the repository does not have.
+  adhoc-packages:
+    ignore:
+      - ci.yml
