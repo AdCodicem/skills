@@ -52,7 +52,10 @@ A public repository (presets are read without credentials when public) holding
   `automerge: true`; majors not.
 - `semanticCommitType: "build"`, `semanticCommitScope: "deps"`, and `fix` for
   runtime dependency types (`dependencies`, `peerDependencies`,
-  `project.dependencies`).
+  `project.dependencies`). `build` is also set by the first package rule
+  (`matchPackageNames: ["*"]`): `config:recommended` includes
+  `:semanticPrefixFixDepsChoreOthers`, whose package rule would otherwise
+  override the top-level value and title every update `chore(deps)`.
 - Weekly lock file maintenance.
 
 Repositories reference it as `github>{{owner}}/renovate-config`. Version it

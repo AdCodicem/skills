@@ -38,6 +38,13 @@
   },
   "packageRules": [
     {
+      "description": "config:recommended's :semanticPrefixFixDepsChoreOthers would title every update chore(deps): restore build(deps) as the default. The fix(deps) rule below still wins for what ships.",
+      "matchPackageNames": [
+        "*"
+      ],
+      "semanticCommitType": "build"
+    },
+    {
       "description": "Non-major updates merge on their own once the required checks pass.",
       "matchUpdateTypes": [
         "minor",
