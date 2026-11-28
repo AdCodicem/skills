@@ -1,2 +1,29 @@
+# Normalize line endings: LF in the repository and in working copies.
+* text=auto eol=lf
+
 # Shell scripts must keep LF endings: bash fails on CRLF (eval scaffold scripts, hooks).
 *.sh text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries are never diffed or normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+
+# Generated files: collapsed in diffs, excluded from language statistics.
+CHANGELOG.md linguist-generated
+.release-please-manifest.json linguist-generated

@@ -12,6 +12,8 @@
   },
   "ignores": [
     "**/node_modules/**",
+    ".venv/**",
+    "venv/**",
     "**/CHANGELOG.md",
     "**/evals/**",
     "plugins/*/skills/*/templates/**",

@@ -1,1 +1,5 @@
+# Code owners review the paths they own. Later lines win.
 * @AdCodicem
+
+# Workflows always need a code owner.
+/.github/ @AdCodicem

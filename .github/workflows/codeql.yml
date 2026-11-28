@@ -1,34 +1,58 @@
-name: CodeQL
+name: codeql
 
+# Standard tier and up, where CodeQL is free: public repositories, or private
+# ones with GitHub Code Security (its license forbids it on other private
+# code; references/areas/security.md). Advanced setup, so that each pull
+# request gets a `CodeQL` check, which the main-human-gates ruleset requires:
+# it fails on new alerts at or above the repository's threshold, compared with
+# main, honors dismissed alerts, and a `neutral` result counts as passing. The
+# bots' App is exempt from that ruleset, so dependency updates never wait on it.
+#
+# No `paths` filter: a required check that never reports blocks the merge.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
   schedule:
-    - cron: "27 4 * * 1"
+    - cron: "27 4 * * 3"
+  workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
+    name: analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      actions: read
       contents: read
+      actions: read
       security-events: write
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, python]
+        # Keep `actions` (every repository has workflows, so the check always
+        # reports) and the languages of the modules present.
+        include:
+          - language: actions
+            build-mode: none
+          - language: python
+            build-mode: none
     steps:
-      - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
-      - uses: github/codeql-action/analyze@v4
+          build-mode: ${{ matrix.build-mode }}
+
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
         with:
           category: /language:${{ matrix.language }}
