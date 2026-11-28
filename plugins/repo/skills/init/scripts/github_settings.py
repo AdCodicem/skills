@@ -369,7 +369,12 @@ def plan(
         "delete_branch_on_merge": True,
         "allow_update_branch": True,
     }
+    # GitHub validates the squash title and message as a pair (PR_TITLE goes with
+    # PR_BODY, BLANK or COMMIT_MESSAGES): a request carrying only one of them is
+    # refused with HTTP 422 when it no longer matches the other's current value.
+    squash_pair = ("squash_merge_commit_title", "squash_merge_commit_message")
     for key, desired in merge.items():
+        body = {k: merge[k] for k in squash_pair} if key in squash_pair else {key: desired}
         changes.append(
             _compare(
                 "merge",
@@ -378,7 +383,7 @@ def plan(
                 desired,
                 method="PATCH",
                 endpoint=endpoint,
-                body={key: desired},
+                body=body,
             )
         )
     if oss and tier != "minimal":

@@ -293,6 +293,16 @@ def test_capabilities(visibility, owner, plan, rulesets, reviewers):
     assert can["environment_reviewers"] is reviewers
 
 
+def test_squash_title_and_message_are_sent_together():
+    fake = FakeGh(responses())
+    _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-oss")
+    message = changes_by_setting(changes)["squash_merge_commit_message"]
+    assert message.body == {
+        "squash_merge_commit_title": "PR_TITLE",
+        "squash_merge_commit_message": "PR_BODY",
+    }
+
+
 def test_company_profiles_get_no_admin_bypass():
     fake = FakeGh(responses())
     _, changes = gs.plan(gs.GitHub(fake), REPO, "company-oss", release_app_id=7)
