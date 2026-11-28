@@ -50,6 +50,8 @@ TIMEOUT = 60
 FILES = {
     "preset": [
         ("default.json", "preset/default.json", "preset-json"),
+        ("groups-ecosystem.json", "preset/groups-ecosystem.json", "json"),
+        ("groups-weekly.json", "preset/groups-weekly.json", "json"),
         ("README.md", "preset/README.md", "text"),
     ],
     "runner": [

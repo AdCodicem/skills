@@ -25,7 +25,7 @@ an action reference or a setting from memory.
   when copying, and never create a `dot-*` file in the target repository.
 - **Placeholders** are written `{{name}}`, lowercase with hyphens: the core
   uses `{{owner}}`, `{{repo}}`, `{{project}}`, `{{package}}`, `{{year}}`,
-  `{{copyright-holder}}`, `{{codeowner}}` and `{{renovate-bot}}`; each module
+  `{{copyright-holder}}`, `{{codeowner}}`, `{{renovate-bot}}` and `{{renovate-groups}}`; each module
   lists its own (`{{nuget-user}}`, `{{python-min}}`, `{{node-oldest-lts}}`,
   `{{infra-dir}}`, `{{domain}}`, ...). Fill every one: a placeholder left in a
   generated file is a bug. A placeholder in prose (`{{One sentence: what this
@@ -90,6 +90,13 @@ where it exists, four questions at most per call).
    ([references/deploy/model.md](references/deploy/model.md)).
 6. **Names**: package or namespace root, copyright holder and year, code
    owner. Never guess them.
+7. **Dependency update grouping**, so Renovate does not open one pull request
+   per bump: by ecosystem (recommended: one pull request per ecosystem for
+   tooling, so a broken package blocks only its ecosystem), one weekly batch
+   (fewest pull requests, but one broken package holds the whole batch), or
+   small groups (monorepos only, one pull request per package). It fills
+   `{{renovate-groups}}` (`groups-ecosystem`, `groups-weekly`, or the line is
+   removed); see [references/areas/dependencies.md](references/areas/dependencies.md).
 
 Then check what the **GitHub plan** allows for this visibility
 ([references/github-plans.md](references/github-plans.md)) and say upfront
