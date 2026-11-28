@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "One weekly batch, extended after the default preset: every non-major update of tooling in one pull request on Monday morning. Shipped dependencies, majors and vulnerability fixes keep one pull request each, at any time.",
+  "packageRules": [
+    {
+      "description": "Every non-major update, once a week.",
+      "matchPackageNames": [
+        "*"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "all non-major dependencies",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "description": "Shipped dependencies leave the batch: each one releases a patch (fix(deps)) and gets its own pull request.",
+      "matchDepTypes": [
+        "dependencies",
+        "peerDependencies",
+        "project.dependencies",
+        "project.optional-dependencies"
+      ],
+      "groupName": null,
+      "schedule": [
+        "at any time"
+      ]
+    }
+  ]
+}
