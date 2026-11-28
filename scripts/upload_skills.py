@@ -25,7 +25,10 @@ import uuid
 from collections.abc import Callable
 from pathlib import Path
 
-from skills_lib import REPO_ROOT, load_json
+# Standard library only, and no import of skills_lib (which needs PyYAML): the
+# release workflow runs this script in the job that holds the API key, where no
+# third-party package is installed.
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 API_URL = "https://api.anthropic.com/v1/skills"
 API_VERSION = "2026-10-21"
@@ -90,7 +93,7 @@ class SkillsClient:
 
 def upload(dist: Path, client: SkillsClient | None, dry_run: bool = False) -> list[str]:
     """Upload API-targeted skills and return one log line per skill."""
-    manifest = load_json(dist / "manifest.json")
+    manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
     targets = [s for s in manifest.get("skills", []) if "api" in s["surfaces"]]
     if not targets:
         return ["No skill targets the API: nothing to upload."]

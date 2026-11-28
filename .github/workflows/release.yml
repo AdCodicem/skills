@@ -1,43 +1,113 @@
-name: Release
+name: release
 
+# Each plugin is versioned on its own by release-please (ADR 3, docs/releasing.md):
+#
+#   release-please  on every push to main, opens or updates one release PR per
+#                   plugin; merging one tags <plugin>-v<version> and creates a
+#                   draft release
+#   pack            packages the released plugins' portable skills, without any
+#                   credential, and records their SHA-256 digests
+#   publish         in the `release` environment (approved by the maintainer):
+#                   digests checked, zips attested and attached to the draft,
+#                   the draft published (immutable from then on), API skills
+#                   uploaded
+#
+# Builds never share a job with a credential, and no job restores a cache.
+# If publish fails, the release stays a draft: fix the cause and re-run it.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   release-please:
     name: Release PRs and tags
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    timeout-minutes: 10
+    # Holds the release App key; deployment branch main, no reviewer: merging
+    # a release PR is the human decision.
+    environment: release-please
+    permissions: {}
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
       paths_released: ${{ steps.release.outputs.paths_released }}
       all: ${{ toJSON(steps.release.outputs) }}
     steps:
-      - uses: googleapis/release-please-action@v5
+      # An App token, unlike GITHUB_TOKEN, triggers CI on the release PRs it opens.
+      - name: Release token
+        id: app-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
         with:
-          # A PAT or GitHub App token lets CI run on release PRs; GITHUB_TOKEN
-          # works but GitHub does not trigger workflows on the PRs it opens.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # If this job fails, the release stays a draft: fix the cause and re-run it.
-  publish:
-    name: Publish ${{ matrix.path }}
+  pack:
+    name: Pack ${{ matrix.path }}
     needs: release-please
     if: needs.release-please.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        path: ${{ fromJSON(needs.release-please.outputs.paths_released) }}
+    env:
+      PLUGIN_PATH: ${{ matrix.path }}
+      TAG: ${{ fromJSON(needs.release-please.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      # No cache: a poisoned cache must never reach a release.
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+      - run: pip install -r requirements-dev.txt
+      - name: Package portable skills
+        run: |
+          python scripts/package_skills.py --plugin "$(basename "$PLUGIN_PATH")" --out dist
+          (cd dist && find . -type f -print0 | sort -z | xargs -0 sha256sum > ../SHA256SUMS)
+          mv SHA256SUMS dist/
+      - id: artifact
+        name: Artifact name
+        run: echo "name=release-$(basename "$PLUGIN_PATH")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish ${{ matrix.path }}
+    needs: [release-please, pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Required reviewer: the maintainer; deployment branch: main. Holds
+    # ANTHROPIC_API_KEY.
+    environment: release
+    permissions:
+      contents: write # attach files to the draft and publish it
+      id-token: write # attestations
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -47,34 +117,57 @@ jobs:
       TAG: ${{ fromJSON(needs.release-please.outputs.all)[format('{0}--tag_name', matrix.path)] }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
-      - uses: actions/checkout@v7
+      # The checkout only provides scripts/upload_skills.py (standard library
+      # only); nothing is installed or built in this job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.TAG }}
-      - uses: actions/setup-python@v7
+          persist-credentials: false
+      - id: artifact
+        name: Artifact name
+        run: echo "name=release-$(basename "$PLUGIN_PATH")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          python-version: "3.11"
-          cache: pip
-      - run: pip install -r requirements-dev.txt
-      - name: Package portable skills
-        run: python scripts/package_skills.py --plugin "$(basename "$PLUGIN_PATH")" --out dist
-      - name: Attach zips to the GitHub release
+          name: ${{ steps.artifact.outputs.name }}
+          path: dist
+      - name: Check the digests recorded by pack
+        working-directory: dist
+        run: sha256sum --check --strict SHA256SUMS
+
+      - name: Find the zips
+        id: zips
+        run: |
+          if compgen -G "dist/*.zip" > /dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No portable skill in $PLUGIN_PATH: nothing to attach."
+          fi
+      - name: Attest the zips
+        id: attest
+        if: steps.zips.outputs.found == 'true' && !github.event.repository.private
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*.zip
+      - name: Attach the zips and the attestation bundle to the draft
+        if: steps.zips.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          shopt -s nullglob
-          zips=(dist/*.zip)
-          if [ ${#zips[@]} -eq 0 ]; then
-            echo "No portable skill in $PLUGIN_PATH: nothing to attach."
-          else
-            gh release upload "$TAG" "${zips[@]}" --clobber
+          files=(dist/*.zip)
+          if [ -n "$BUNDLE" ]; then
+            cp "$BUNDLE" "dist/${TAG}.sigstore.json"
+            files+=("dist/${TAG}.sigstore.json")
           fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
       # release-please creates draft releases (see release-please-config.json):
       # with immutable releases on, assets cannot be added once a release is
-      # published, so publish it only after the zips are attached.
+      # published, so publish it only after the files are attached.
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release edit "$TAG" --draft=false
+        run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
       - name: Upload API skills
         if: env.ANTHROPIC_API_KEY != ''
-        run: python scripts/upload_skills.py --dist dist
+        run: python3 scripts/upload_skills.py --dist dist

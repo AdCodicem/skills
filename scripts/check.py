@@ -24,7 +24,10 @@ from skills_lib import REPO_ROOT, discover_plugins
 
 def run(label: str, command: list[str]) -> bool:
     print(f"\n=== {label}\n$ {' '.join(command)}", flush=True)
-    return subprocess.run(command, cwd=REPO_ROOT).returncode == 0
+    # On Windows, CreateProcess does not resolve `.cmd` shims such as npx.cmd:
+    # launch the full path that shutil.which found.
+    executable = shutil.which(command[0]) or command[0]
+    return subprocess.run([executable, *command[1:]], cwd=REPO_ROOT).returncode == 0
 
 
 def main() -> int:

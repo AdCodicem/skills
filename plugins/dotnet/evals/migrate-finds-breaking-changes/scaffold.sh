@@ -65,4 +65,3 @@ public sealed class OrderStore
     public Task<string> EnrichAsync(string order) => Task.FromResult(order.ToUpperInvariant());
 }
 FIXTURE
-

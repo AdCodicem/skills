@@ -1,0 +1,19 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about a plugin or a skill? Search existing
+        discussions first: someone may have asked already.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do, and what is not working or unclear?
+    validations:
+      required: true
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin and version
+      description: For example `dotnet 1.0.1`.

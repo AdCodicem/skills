@@ -1,0 +1,42 @@
+# https://pre-commit.com (or https://github.com/j178/prek, a compatible drop-in).
+# Run once: `pre-commit install`. CI runs every hook on every file (lint.yml).
+# Renovate moves each `rev` to its latest release.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-illegal-windows-names
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      # Templates shipped by the repository and by skills contain placeholders
+      # and keep their own conventions: syntax and whitespace hooks skip them.
+      # gitleaks still scans every file.
+      - id: check-json
+        exclude: &templates '^(templates/|plugins/[^/]+/skills/[^/]+/(templates|assets)/)'
+      - id: check-toml
+        exclude: *templates
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: *templates
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: *templates
+      - id: mixed-line-ending
+        args: [--fix=no]
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: *templates
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  # Same version as requirements-dev.txt, so the hook and CI agree.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+      - id: ruff-format

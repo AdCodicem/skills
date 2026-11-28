@@ -20,4 +20,3 @@ cat > 'Contacts.csproj' <<'FIXTURE'
   </PropertyGroup>
 </Project>
 FIXTURE
-
