@@ -10,7 +10,8 @@ Settings:
   auto-merge allowed, branches deleted after merge, update branch allowed;
 - two layered rulesets on the default branch: `main`, for everyone (no
   deletion, no force push, linear history, squash-only pull requests with
-  threads resolved, required checks not strict; the release App may bypass),
+  threads resolved, required checks not strict; the release App may bypass;
+  on personal profiles admins may bypass through a pull request only),
   and `main-human-gates`, which the bots' App (Renovate's) and the release App
   are exempt from (branches up to date, the `CodeQL` check, and a code owner's
   approval for team profiles);
@@ -50,6 +51,9 @@ TIERS = ("minimal", "standard", "complete")
 DEFAULT_CHECKS = ("gate", "pr-title", "workflows", "pre-commit")
 RULESET_NAME = "main"
 HUMAN_GATES_NAME = "main-human-gates"
+# GitHub's built-in repository role IDs: 5 is Admin.
+ADMIN_ROLE_ID = 5
+ADMIN_BYPASS = ("pull-request", "none")
 TIMEOUT = 60
 
 Runner = Callable[[list[str], str | None], tuple[int, str, str]]
@@ -145,8 +149,21 @@ def _skip(area: str, setting: str, reason: str, desired: object = None) -> Chang
     return Change(area, setting, None, desired, "skip", reason)
 
 
-def _bypass(release_app_id: int | None, bots_app_id: int | None, mode: str) -> list[dict]:
+def _bypass(
+    release_app_id: int | None, bots_app_id: int | None, mode: str, admin_bypass: str = "none"
+) -> list[dict]:
     actors = []
+    if admin_bypass == "pull-request":
+        # A way out for a solo maintainer, who can never approve their own pull
+        # request: merge one whose checks are red or stuck, ticking "bypass
+        # rules" on the pull request. Never a direct push to main.
+        actors.append(
+            {
+                "actor_id": ADMIN_ROLE_ID,
+                "actor_type": "RepositoryRole",
+                "bypass_mode": "pull_request",
+            }
+        )
     if release_app_id:
         actors.append(
             {"actor_id": release_app_id, "actor_type": "Integration", "bypass_mode": mode}
@@ -154,6 +171,11 @@ def _bypass(release_app_id: int | None, bots_app_id: int | None, mode: str) -> l
     if bots_app_id and mode == "exempt":
         actors.append({"actor_id": bots_app_id, "actor_type": "Integration", "bypass_mode": mode})
     return actors
+
+
+def default_admin_bypass(profile: str) -> str:
+    """Solo profiles keep a pull-request-only bypass; teams have reviewers instead."""
+    return "pull-request" if profile.startswith("personal") else "none"
 
 
 def _checks_rule(checks: list[str], strict: bool) -> dict:
@@ -171,7 +193,7 @@ def _target() -> dict:
     return {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}}
 
 
-def ruleset_body(checks: list[str], release_app_id: int | None) -> dict:
+def ruleset_body(checks: list[str], release_app_id: int | None, admin_bypass: str = "none") -> dict:
     """`main`, for everyone: what bots and people alike must respect."""
     return {
         "name": RULESET_NAME,
@@ -179,7 +201,7 @@ def ruleset_body(checks: list[str], release_app_id: int | None) -> dict:
         "enforcement": "active",
         "conditions": _target(),
         # The release App pushes the changelog commit and the tag.
-        "bypass_actors": _bypass(release_app_id, None, "always"),
+        "bypass_actors": _bypass(release_app_id, None, "always", admin_bypass),
         "rules": [
             {"type": "deletion"},
             {"type": "non_fast_forward"},
@@ -206,6 +228,7 @@ def human_gates_body(
     code_scanning: bool,
     release_app_id: int | None,
     bots_app_id: int | None,
+    admin_bypass: str = "none",
 ) -> dict:
     """`main-human-gates`: the bars people meet and the bots' App is exempt from.
 
@@ -235,7 +258,7 @@ def human_gates_body(
         "target": "branch",
         "enforcement": "active",
         "conditions": _target(),
-        "bypass_actors": _bypass(release_app_id, bots_app_id, "exempt"),
+        "bypass_actors": _bypass(release_app_id, bots_app_id, "exempt", admin_bypass),
         "rules": rules,
     }
 
@@ -263,10 +286,15 @@ def _ruleset_summary(ruleset: dict | None) -> dict | None:
 
 
 def _ruleset_change(endpoint: str, body: dict, existing: dict | None) -> Change:
-    """Create or update one ruleset; keep bypass actors set by hand when none are given."""
+    """Create or update one ruleset; keep bypass actors set by hand when no App is given."""
     current = _ruleset_summary(existing)
-    if existing and not body["bypass_actors"]:
-        body["bypass_actors"] = existing.get("bypass_actors") or []
+    if existing and not any(a["actor_type"] == "Integration" for a in body["bypass_actors"]):
+        managed = {(a["actor_type"], a["actor_id"]) for a in body["bypass_actors"]}
+        body["bypass_actors"] = body["bypass_actors"] + [
+            a
+            for a in existing.get("bypass_actors") or []
+            if (a.get("actor_type"), a.get("actor_id")) not in managed
+        ]
     desired = _ruleset_summary(body)
     if existing:
         return _compare(
@@ -301,6 +329,7 @@ def plan(
     checks: list[str] | None = None,
     code_security: bool = False,
     bots_app_id: int | None = None,
+    admin_bypass: str | None = None,
 ) -> tuple[dict, list[Change]]:
     response = gh.get(f"repos/{repo}")
     if response.status != 200 or not isinstance(response.data, dict):
@@ -382,9 +411,13 @@ def plan(
                         existing_by_name[item["name"]] = detail.data
         required = checks or list(DEFAULT_CHECKS)
         code_scanning = tier != "minimal" and can["codeql"]
+        if admin_bypass is None:
+            admin_bypass = default_admin_bypass(profile)
         bodies = [
-            ruleset_body(required, release_app_id),
-            human_gates_body(profile, required, code_scanning, release_app_id, bots_app_id),
+            ruleset_body(required, release_app_id, admin_bypass),
+            human_gates_body(
+                profile, required, code_scanning, release_app_id, bots_app_id, admin_bypass
+            ),
         ]
         for body in bodies:
             changes.append(_ruleset_change(endpoint, body, existing_by_name.get(body["name"])))
@@ -711,6 +744,12 @@ def main(argv: list[str] | None = None, gh: GitHub | None = None) -> int:
     parser.add_argument(
         "--code-security", action="store_true", help="the private repository has the add-ons"
     )
+    parser.add_argument(
+        "--admin-bypass",
+        choices=ADMIN_BYPASS,
+        help="let admins merge a pull request past both rulesets (default: pull-request for "
+        "personal profiles, none for company ones); never a direct push",
+    )
     parser.add_argument("--apply", action="store_true", help="make the changes")
     parser.add_argument("--json", action="store_true", help="print JSON")
     args = parser.parse_args(argv)
@@ -728,6 +767,7 @@ def main(argv: list[str] | None = None, gh: GitHub | None = None) -> int:
             args.check,
             args.code_security,
             args.bots_app_id,
+            args.admin_bypass,
         )
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)

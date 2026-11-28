@@ -33,6 +33,14 @@ no force push, no deletion, linear history) and the `gate` check. Scorecard's
 Code-Review check stays low; auto-approving with a bot to raise it would be
 dishonest, so the skill does not do it for solo profiles.
 
+The maintainer validates a change by merging it once the checks are green.
+For the day a check is red for a reason outside the change, or never reports
+(a flaky analysis, a CI outage), both rulesets let the Admin role bypass them
+**through a pull request only** (`bypass_mode: pull_request`, set by
+`scripts/github_settings.py` for personal profiles): the pull request shows a
+"bypass rules" box, GitHub records the bypass, and a direct push to `main`
+stays refused. Teams get no such bypass: they have reviewers.
+
 For teams, approval matters, and it lives in the `main-human-gates` ruleset,
 which Renovate's App is exempt from: people need a code owner's approval, bot
 updates need none, and no workflow approves anything
