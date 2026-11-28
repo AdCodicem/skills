@@ -1,0 +1,105 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Grouping by ecosystem, extended after the default preset: non-major updates of tooling (what ships in no package) come as one pull request per ecosystem. Shipped dependencies, majors and vulnerability fixes keep one pull request each.",
+  "packageRules": [
+    {
+      "description": "GitHub Actions and the tools pinned in workflows.",
+      "matchFileNames": [
+        ".github/**"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "pre-commit hooks.",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "pre-commit hooks"
+    },
+    {
+      "description": "npm development dependencies and the package manager.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies",
+        "packageManager"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "npm dev dependencies"
+    },
+    {
+      "description": "Python development dependencies: PEP 735 groups, uv and PDM dev dependencies, build requirements.",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDepTypes": [
+        "dependency-groups",
+        "tool.uv.dev-dependencies",
+        "tool.pdm.dev-dependencies",
+        "build-system.requires"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "Python dev dependencies"
+    },
+    {
+      "description": "Python development requirements files.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "**/*requirements-dev*.txt",
+        "**/dev-requirements*.txt",
+        "**/requirements/dev*.txt"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": "Python dev dependencies"
+    },
+    {
+      "description": "NuGet packages, the .NET SDK and local tools; the packages a repository ships are taken out of the group by the .NET module's rule (groupName null).",
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
+      "groupName": ".NET packages"
+    }
+  ]
+}

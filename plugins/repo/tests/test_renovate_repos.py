@@ -49,6 +49,8 @@ def current_clones(tmp_path: Path) -> tuple[Path, Path]:
         tmp_path / "preset",
         {
             "default.json": template("preset/default.json"),
+            "groups-ecosystem.json": template("preset/groups-ecosystem.json"),
+            "groups-weekly.json": template("preset/groups-weekly.json"),
             "README.md": template("preset/README.md"),
         },
     )
@@ -187,6 +189,8 @@ def test_reads_through_gh_and_reports_a_missing_runner(capsys):
     rows = json.loads(capsys.readouterr().out)
     assert [(r["path"], r["status"]) for r in rows] == [
         ("default.json", "ok"),
+        ("groups-ecosystem.json", "missing"),
+        ("groups-weekly.json", "missing"),
         ("README.md", "ok"),
         ("", "missing"),
     ]

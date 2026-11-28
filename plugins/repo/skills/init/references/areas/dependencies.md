@@ -22,10 +22,25 @@ and its auto-merge is enabled by `GITHUB_TOKEN`, which no ruleset can exempt.
 - **Release age**: Renovate proposes a version once it has been public for
   three days (`minimumReleaseAge: "3 days"`); a compromised release is usually
   pulled within that window. Vulnerability fixes skip it and open at once.
-- **Small groups**: Renovate's monorepo groups (packages released together,
-  such as `xunit.v3.*` or `@typescript-eslint/*`) and one pull request per
-  package otherwise. A group of forty updates fails as a whole when one
-  package breaks, and blocks thirty-nine good updates with it.
+- **Grouping, chosen per repository** (step 2 of SKILL.md), so bumps do not
+  arrive as one pull request per package. The shared preset publishes each
+  policy as a named preset that `renovate.json` extends after the default one:
+
+  | Policy | Preset | Pull requests | Trade-off |
+  | --- | --- | --- | --- |
+  | By ecosystem (recommended) | `github>{{owner}}/renovate-config:groups-ecosystem` | one per ecosystem for non-major tooling updates: GitHub Actions (everything under `.github/`), pre-commit hooks, npm dev dependencies, Python dev dependencies, .NET packages | a broken package blocks only its ecosystem's group |
+  | One weekly batch | `github>{{owner}}/renovate-config:groups-weekly` | one for every non-major tooling update, Monday before 6am | fewest pull requests; one broken package holds the whole batch for a week |
+  | Small groups | none (the line is removed) | Renovate's monorepo groups, one per package otherwise | most pull requests; each one fails alone |
+
+  Whatever the policy, three kinds of update keep one pull request each:
+  majors (a person reads their notes), vulnerability fixes (Renovate's
+  `vulnerabilityAlerts` set no group and no schedule), and **shipped
+  dependencies**, so each `fix(deps)` stays one changelog line and one patch.
+  npm and Python shipped dependencies are left out by dependency type; the
+  NuGet packages a repository ships are taken out by the .NET module's rule
+  (`groupName: null`). Monorepo groups (`xunit.v3.*`, `@typescript-eslint/*`)
+  and the modules' own groups (TypeScript, Pulumi, Microsoft.Testing.Platform)
+  still apply.
 - **Unattended merge of non-majors**: minor, patch, digest, pin and lock file
   maintenance updates merge once the checks of the `main` ruleset pass; majors
   wait for a person, who reads the release notes.

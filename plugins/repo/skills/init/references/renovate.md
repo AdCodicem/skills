@@ -58,6 +58,11 @@ A public repository (presets are read without credentials when public) holding
   override the top-level value and title every update `chore(deps)`.
 - Weekly lock file maintenance.
 
+Next to it, `groups-ecosystem.json` and `groups-weekly.json`
+(`templates/renovate/preset/`) hold the two grouping policies; a repository
+extends at most one, after the default preset
+(`github>{{owner}}/renovate-config:groups-ecosystem`).
+
 Repositories reference it as `github>{{owner}}/renovate-config`. Version it
 with tags when a change could surprise repositories
 (`github>{{owner}}/renovate-config#v1`).
@@ -93,7 +98,9 @@ those opened with `GITHUB_TOKEN`.
 ## Per repository
 
 1. Copy `templates/renovate/renovate.json` to the repository root; fill
-   `{{owner}}`.
+   `{{owner}}`, and `{{renovate-groups}}` with the grouping chosen in step 2
+   (`groups-ecosystem` or `groups-weekly`), or remove that line for small
+   groups ([dependencies](areas/dependencies.md)).
 2. Merge each module's `renovate-rules.json` `packageRules` into it (for .NET,
    the shipped packages that take `fix`).
 3. Install the Renovate App on the repository.
