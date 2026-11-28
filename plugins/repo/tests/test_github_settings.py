@@ -16,6 +16,7 @@ sys.modules[spec.name] = gs
 spec.loader.exec_module(gs)
 
 REPO = "me/lib"
+ADMIN_PR_BYPASS = {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "pull_request"}
 
 
 class FakeGh:
@@ -132,7 +133,8 @@ def test_public_personal_repository_gets_the_full_standard():
     assert checks["strict_required_status_checks_policy"] is False
     assert contexts(checks) == ["gate", "pr-title", "workflows", "pre-commit"]
     assert main.body["bypass_actors"] == [
-        {"actor_id": 7, "actor_type": "Integration", "bypass_mode": "always"}
+        ADMIN_PR_BYPASS,
+        {"actor_id": 7, "actor_type": "Integration", "bypass_mode": "always"},
     ]
 
     gates = settings["main-human-gates"]
@@ -141,6 +143,7 @@ def test_public_personal_repository_gets_the_full_standard():
     assert contexts(gate_rules["required_status_checks"])[-1] == "CodeQL"
     assert "pull_request" not in gate_rules  # solo: no approval
     assert gates.body["bypass_actors"] == [
+        ADMIN_PR_BYPASS,
         {"actor_id": 7, "actor_type": "Integration", "bypass_mode": "exempt"},
         {"actor_id": 8, "actor_type": "Integration", "bypass_mode": "exempt"},
     ]
@@ -223,7 +226,7 @@ def test_existing_ruleset_is_updated_and_its_bypass_kept():
     settings = changes_by_setting(changes)
     ruleset = settings["main"]
     assert ruleset.method == "PUT" and ruleset.endpoint == f"repos/{REPO}/rulesets/9"
-    assert ruleset.body["bypass_actors"] == existing["bypass_actors"]
+    assert ruleset.body["bypass_actors"] == [ADMIN_PR_BYPASS, *existing["bypass_actors"]]
     assert settings["main-human-gates"].method == "POST"
 
 
@@ -288,3 +291,37 @@ def test_capabilities(visibility, owner, plan, rulesets, reviewers):
     can = gs.capabilities(visibility, owner, plan, code_security=False)
     assert can["rulesets"] is rulesets
     assert can["environment_reviewers"] is reviewers
+
+
+def test_company_profiles_get_no_admin_bypass():
+    fake = FakeGh(responses())
+    _, changes = gs.plan(gs.GitHub(fake), REPO, "company-oss", release_app_id=7)
+    settings = changes_by_setting(changes)
+    assert ADMIN_PR_BYPASS not in settings["main"].body["bypass_actors"]
+    assert ADMIN_PR_BYPASS not in settings["main-human-gates"].body["bypass_actors"]
+
+
+def test_admin_bypass_can_be_turned_off_for_a_personal_profile():
+    fake = FakeGh(responses())
+    _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-oss", admin_bypass="none")
+    assert changes_by_setting(changes)["main"].body["bypass_actors"] == []
+
+
+def test_admin_bypass_replaces_an_always_bypass_set_by_hand():
+    existing = {
+        "id": 9,
+        "name": "main",
+        "enforcement": "active",
+        "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+        "rules": [{"type": "deletion"}],
+    }
+    fake = FakeGh(
+        responses(
+            overrides={
+                ("GET", f"repos/{REPO}/rulesets"): (200, [{"id": 9, "name": "main"}]),
+                ("GET", f"repos/{REPO}/rulesets/9"): (200, existing),
+            }
+        )
+    )
+    _, changes = gs.plan(gs.GitHub(fake), REPO, "personal-oss")
+    assert changes_by_setting(changes)["main"].body["bypass_actors"] == [ADMIN_PR_BYPASS]
