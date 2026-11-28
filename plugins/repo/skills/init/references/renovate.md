@@ -101,6 +101,45 @@ those opened with `GITHUB_TOKEN`.
    exempts it from `main-human-gates` and turns Dependabot security updates
    off (alerts stay on). Remove any `dependabot.yml`.
 
+## Keeping the preset and runner current
+
+The two account repositories are created once, then drift as the templates
+improve. Whenever the skill touches dependencies (a new repository or an
+audit), compare them with the templates:
+
+```bash
+python3 scripts/renovate_repos.py --owner {{owner}} --diff
+```
+
+It reads both repositories through `gh api` and reports each file as `ok`,
+`drift`, `missing` or `unresolved` (a value it could not find: `--timezone`
+when the preset has none yet, `--bot-slug` when `config.js` has no
+`gitAuthor`). The comparison keeps what belongs to the account:
+
+- `default.json`: the template's settings and package rules (matched by
+  `description`) win; the account's timezone, its extra settings and its extra
+  package rules stay, each right after the rule it followed, since later
+  package rules win.
+- `renovate.yml`: the action pins and the `# renovate:` versions are masked,
+  because Renovate updates them; an update keeps the live ones.
+- `config.js`: the bot identity comes from the live `gitAuthor`.
+
+To update, show the diff to the user, then clone the repository, run the
+script on the clone and review the result:
+
+```bash
+gh repo clone {{owner}}/renovate-config /tmp/renovate-config
+python3 scripts/renovate_repos.py --owner {{owner}} --preset-dir /tmp/renovate-config --write
+git -C /tmp/renovate-config diff
+```
+
+(`--runner-dir` likewise for the runner, then `scripts/latest_versions.py
+--root <clone> --write` to pin any action the template added by tag.) Commit
+with a Conventional Commit (`fix:` or `feat:`, the preset is consumed by every
+repository at its next run) and push or open a pull request only once the
+user agrees. A preset change that could surprise repositories goes out as a
+new tag (`#v2`).
+
 ## Audit checklist
 
 - `renovate.json` extends the shared preset; no per-repository copy of rules
@@ -109,3 +148,4 @@ those opened with `GITHUB_TOKEN`.
 - The Dependency Dashboard issue exists and shows nothing stuck for more than
   two weeks.
 - The runner pins `renovate-version` and runs at least daily.
+- `scripts/renovate_repos.py --owner {{owner}}` reports every file `ok`.
