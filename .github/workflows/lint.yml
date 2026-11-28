@@ -79,6 +79,9 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      # renovate: datasource=pypi depName=pre-commit
+      PRE_COMMIT_VERSION: 4.7.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,4 +89,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version-file: .python-version
-      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+      # Not pre-commit/action: it is a composite action that calls actions/cache
+      # by tag, which the "require actions pinned to a full-length commit SHA"
+      # policy refuses. The same steps, with every action pinned here.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+      - run: pip install "pre-commit==${PRE_COMMIT_VERSION}"
+      - run: pre-commit run --all-files --show-diff-on-failure --color=always
