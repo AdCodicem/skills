@@ -3,26 +3,43 @@
   "packageRules": [
     {
       "description": "NuGet packages, the .NET SDK in global.json and the local tools are build tooling: build(deps), which releases nothing.",
-      "matchManagers": ["nuget"],
+      "matchManagers": [
+        "nuget"
+      ],
       "semanticCommitType": "build"
     },
     {
-      "description": "Packages that ship as dependencies of this repository's NuGet packages (the <dependency> elements of the packed .nuspec files): fix(deps), so an update releases a patch.",
-      "matchManagers": ["nuget"],
-      "matchPackageNames": ["{{shipped-package}}"],
-      "semanticCommitType": "fix"
+      "description": "Packages that ship as dependencies of this repository's NuGet packages (the <dependency> elements of the packed .nuspec files): fix(deps), so an update releases a patch. groupName null takes them out of the grouping presets, so each one keeps its own pull request.",
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchPackageNames": [
+        "{{shipped-package}}"
+      ],
+      "semanticCommitType": "fix",
+      "groupName": null
     },
     {
       "description": "A new major of the .NET SDK goes with a framework upgrade: never merged unattended.",
-      "matchManagers": ["nuget"],
-      "matchDepTypes": ["dotnet-sdk"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchDepTypes": [
+        "dotnet-sdk"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false
     },
     {
       "description": "Microsoft.Testing.Platform and its extensions must stay on one release line (MTP 2.4+ constrains extensions to the platform's major).",
-      "matchManagers": ["nuget"],
-      "matchPackageNames": ["/^Microsoft\\.Testing\\./"],
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchPackageNames": [
+        "/^Microsoft\\.Testing\\./"
+      ],
       "groupName": "Microsoft.Testing.Platform"
     }
   ]

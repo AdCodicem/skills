@@ -20,6 +20,7 @@ python3 scripts/github_settings.py --repo OWNER/NAME --profile personal-oss \
 | `--environment NAME` | Creates or updates an environment limited to the default branch (repeat: `release`, `preview`, `staging`, `production`); `release` and `production` get `--reviewer` as required reviewer where the plan allows it |
 | `--release-app-id ID` | The release GitHub App's ID: may bypass `main` (to push the changelog commit and the tag) and is exempt from `main-human-gates` |
 | `--bots-app-id ID` | The Renovate App's ID, exempt from `main-human-gates`, so its updates merge without an up-to-date branch, the `CodeQL` check or a review |
+| `--admin-bypass pull-request\|none` | Lets the Admin role merge a pull request past both rulesets ("bypass rules" on the pull request), never push directly; default `pull-request` for personal profiles, `none` for company ones |
 | `--check NAME` | Replaces the default required checks (`gate`, `pr-title`, `workflows`, `pre-commit`) |
 | `--code-security` | The private repository has GitHub Code Security and Secret Protection |
 | `--apply` | Makes the changes; without it, the script only prints the plan |
@@ -34,7 +35,7 @@ applied, 1 changes pending or some failed, 2 the repository cannot be read.
 | Area | Setting | Value |
 | --- | --- | --- |
 | Merge | squash only; title and body from the pull request; auto-merge; delete branches after merge; update branch | on |
-| Ruleset `main` | deletion, force push, linear history, pull request (squash only, threads resolved, no approval), required checks not strict; the release App may bypass | active on the default branch, for everyone |
+| Ruleset `main` | deletion, force push, linear history, pull request (squash only, threads resolved, no approval), required checks not strict; the release App may bypass; admins may bypass through a pull request on personal profiles | active on the default branch, for everyone |
 | Ruleset `main-human-gates` | required checks strict (branch up to date), the `CodeQL` check where CodeQL runs, a code owner's approval for team profiles; the Renovate and release Apps exempt | active on the default branch, for people |
 | Actions | default workflow token | read-only; never allowed to approve pull requests |
 | Actions | actions pinned to a full SHA | required |

@@ -2,7 +2,11 @@
 
 Runs [Renovate](https://docs.renovatebot.com/) hourly over every repository the
 `{{renovate-bot}}` GitHub App is installed on. Each repository opts in with a
-`renovate.json` that extends [`{{owner}}/renovate-config`](https://github.com/{{owner}}/renovate-config).
+`renovate.json` that extends [`{{owner}}/renovate-config`](https://github.com/{{owner}}/renovate-config);
+a repository without one is left alone.
+
+Private on purpose: Renovate's logs list the dependencies of every repository
+it visits, private ones included.
 
 ## Setup
 

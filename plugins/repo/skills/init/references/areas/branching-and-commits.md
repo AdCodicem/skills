@@ -15,7 +15,7 @@ releasable.
 
   | Ruleset | Applies to | Rules |
   | --- | --- | --- |
-  | `main` | everyone; the release App may bypass (`always`) to push the changelog commit and the tag | no deletion, no force push, linear history, changes only through pull requests, squash only, review threads resolved, the required checks of [ci](ci.md) (`gate`, `pr-title`, `workflows`, `pre-commit`) **not strict** |
+  | `main` | everyone; the release App may bypass (`always`) to push the changelog commit and the tag; on personal profiles, the Admin role may bypass through a pull request only | no deletion, no force push, linear history, changes only through pull requests, squash only, review threads resolved, the required checks of [ci](ci.md) (`gate`, `pr-title`, `workflows`, `pre-commit`) **not strict** |
   | `main-human-gates` | people; the bots' App (Renovate's) and the release App are **exempt** (`bypass_mode: exempt`: the rules are not evaluated for them) | the same checks **strict** (branch up to date with `main`), the `CodeQL` check where CodeQL is available ([security](security.md)), and for team profiles one approval from a code owner |
 
   People get the full bar; Renovate's updates merge as soon as the `main`

@@ -52,6 +52,11 @@ Applied to every workflow the skill writes, and checked in audit mode:
   (`uses: actions/checkout@<sha> # v7.0.1`). `scripts/latest_versions.py
   --write` writes these pins; the repository policy "require actions to be
   pinned to a full-length commit SHA" enforces them.
+- **No composite action that calls another action by tag**: the pinning
+  policy checks the actions a composite action uses too, and refuses the run
+  (`pre-commit/action` calls `actions/cache@v4`, so `lint.yml` runs
+  pre-commit itself, with its own pinned cache step). Check a new action's
+  `action.yml` before adopting it.
 - **Workflow lockfile** `.github/workflows/actions.lock`, which also locks the
   actions that composite actions call (generally available since 2026-10-28;
   GitHub's documentation now recommends it over SHA pinning alone). The skill
